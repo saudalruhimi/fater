@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(npx --yes create-vite@latest ai-scan-temp --template react)",
+      "Bash(cp -r ai-scan-temp/* .)",
+      "Bash(cp ai-scan-temp/.gitignore .)",
+      "Bash(cp ai-scan-temp/.eslintrc.cjs .)",
+      "Bash(rm -rf ai-scan-temp)",
+      "Bash(npm install:*)",
+      "Bash(npx skills:*)",
+      "Bash(npx vite:*)",
+      "WebFetch(domain:apidoc.qoyod.com)",
+      "WebSearch",
+      "WebFetch(domain:www.qoyod.com)",
+      "Bash(node -e \":*)",
+      "Bash(timeout 5 node server/index.js)"
+    ]
+  }
+}
