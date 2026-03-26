@@ -317,7 +317,7 @@ const agentTools = [{
     { name: 'get_vendor_info', description: 'جلب معلومات مورد معين', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' } }, required: ['vendor_name'] } },
     { name: 'get_monthly_summary', description: 'ملخص المشتريات لشهر معين', parameters: { type: 'OBJECT', properties: { month: { type: 'STRING' } }, required: ['month'] } },
     { name: 'create_bill', description: 'إنشاء فاتورة مشتريات - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' }, invoice_number: { type: 'STRING' }, invoice_date: { type: 'STRING' }, total_amount: { type: 'NUMBER' }, items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { description: { type: 'STRING' }, quantity: { type: 'NUMBER' }, unit_price: { type: 'NUMBER' } } } } }, required: ['vendor_name', 'items'] } },
-    { name: 'create_payment', description: 'إنشاء سند صرف على فاتورة بقيود - يحتاج تأكيد. لازم يكون فيه فاتورة غير مدفوعة للمورد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING', description: 'اسم المورد — يبحث عن أقدم فاتورة غير مدفوعة له' }, bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود مباشرة (اختياري)' }, amount: { type: 'NUMBER', description: 'مبلغ السند' }, account_name: { type: 'STRING', description: 'حساب الدفع: بنك الراجحي أو النقدية بالخزينة' }, date: { type: 'STRING' } }, required: ['amount'] } },
+    { name: 'create_payment', description: 'إنشاء سند صرف على فاتورة بقيود - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING', description: 'اسم المورد' }, reference: { type: 'STRING', description: 'رقم مرجع الفاتورة مثل BILL241 — أسرع طريقة للبحث' }, bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود (id)' }, amount: { type: 'NUMBER', description: 'مبلغ السند' }, account_name: { type: 'STRING', description: 'حساب الدفع: بنك الراجحي أو النقدية بالخزينة' }, date: { type: 'STRING' } }, required: ['amount'] } },
     { name: 'scan_invoice_image', description: 'قراءة صورة فاتورة', parameters: { type: 'OBJECT', properties: { action: { type: 'STRING' } } } },
     { name: 'update_bill', description: 'تعديل فاتورة مشتريات موجودة بقيود (لازم تكون موافق عليها مو مدفوعة) - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود (id)' }, reference: { type: 'STRING', description: 'رقم المرجع للبحث' }, notes: { type: 'STRING' }, issue_date: { type: 'STRING' }, due_date: { type: 'STRING' }, items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { description: { type: 'STRING' }, quantity: { type: 'NUMBER' }, unit_price: { type: 'NUMBER' } } } } } } },
     { name: 'delete_bill', description: 'حذف فاتورة مشتريات من قيود (لازم تكون موافق عليها مو مدفوعة) - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود' }, reference: { type: 'STRING', description: 'رقم المرجع للبحث' } } } },
@@ -337,6 +337,21 @@ async function getAllQoyodBills() {
     page++
   }
   return allBills
+}
+
+// Find a specific bill by reference (fast — stops at first match)
+async function findBillByReference(ref) {
+  let page = 1
+  while (page <= 30) {
+    const d = await qoyodRequest('GET', `/bills?page=${page}`)
+    const bills = d.bills || []
+    if (!bills.length) break
+    const found = bills.find(b => (b.reference || '') === ref || (b.reference || '').includes(ref))
+    if (found) return found
+    if (bills.length < 100) break
+    page++
+  }
+  return null
 }
 
 // Agent tool execution — all tools query Qoyod directly
@@ -493,8 +508,16 @@ async function execConfirmed(action, data) {
     // Find the bill to pay
     let billId = data.bill_id
     let vendorName = data.vendor_name || ''
+
+    // Search by reference first (fast)
+    if (!billId && data.reference) {
+      const bill = await findBillByReference(data.reference)
+      if (bill) { billId = bill.id; vendorName = bill.contact?.name || vendorName }
+      else throw new Error(`ما لقيت فاتورة بمرجع "${data.reference}"`)
+    }
+
+    // Search by vendor name (slower)
     if (!billId && vendorName) {
-      // Search for unpaid bills for this vendor
       const allBills = await getAllQoyodBills()
       const s = vendorName.toLowerCase()
       const vendorBills = allBills.filter(b =>
