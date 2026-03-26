@@ -477,17 +477,42 @@ async function execConfirmed(action, data) {
   throw new Error('إجراء غير معروف')
 }
 
-// Chat sessions (in-memory — resets on cold start)
+// Pending confirmations stored in Supabase (survives serverless cold starts)
+async function savePending(userId, action, data) {
+  await supabase.from('telegram_chats').upsert({ user_id: String(userId), role: 'pending_action', content: JSON.stringify({ action, data, ts: Date.now() }) }, { onConflict: 'user_id,role' })
+}
+async function getPending(userId) {
+  const { data } = await supabase.from('telegram_chats').select('content').eq('user_id', String(userId)).eq('role', 'pending_action').single()
+  if (!data?.content) return null
+  try { const p = JSON.parse(data.content); if (Date.now() - p.ts > 600000) return null; return p } catch { return null }
+}
+async function clearPending(userId) {
+  await supabase.from('telegram_chats').delete().eq('user_id', String(userId)).eq('role', 'pending_action')
+}
+
+// Chat sessions (in-memory — will reset on cold start, but that's OK for stateless chats)
 const chatSessions = new Map()
-const pendingConfirmations = new Map()
 
 async function agentProcess(userId, text, imageBuffer = null, mimeType = null) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.0-flash',
-    systemInstruction: `أنت "فاتِر" — مساعد محاسبة ذكي لمؤسسة سعودية. تتكلم بالعربي العامي السعودي البسيط.
-مهامك: بحث فواتير ومعلومات موردين، قراءة صور فواتير، تسجيل فواتير بقيود، سندات صرف، ملخصات وتقارير.
-قواعد: العمليات الحساسة تحتاج تأكيد. رد مختصر ومفيد. المبالغ بالريال السعودي. لو أرسل صورة فاتورة استخدم scan_invoice_image.`,
+    systemInstruction: `أنت "فاتِر" — مساعد محاسبة ذكي لمؤسسة سعودية تستخدم نظام قيود المحاسبي. تتكلم بالعربي العامي السعودي البسيط.
+
+مهامك:
+- تبحث عن فواتير وموردين من نظام قيود
+- تقرأ صور الفواتير الورقية وتستخرج بياناتها
+- تسجل فواتير مشتريات بنظام قيود (مو عندك محلياً — بقيود النظام المحاسبي الفعلي)
+- تسوي سندات صرف بقيود
+- تعطي ملخصات وتقارير من بيانات قيود الفعلية
+
+قواعد مهمة:
+- لما المستخدم يقول "سجل" أو "أدخل" الفاتورة = يبي تنشئها بقيود عبر create_bill
+- لازم تستدعي create_bill مع بيانات الفاتورة (vendor_name, items, invoice_date, invoice_number, total_amount)
+- العمليات الحساسة (تسجيل فاتورة / سند صرف) لازم تعرض البيانات وتقول "أسجلها بقيود؟" قبل التنفيذ
+- لو أرسل صورة فاتورة، أنت تقدر تقرأها مباشرة بالـ Vision — استخرج البيانات وبعدها استدعي create_bill
+- لا تقول "سجلتها عندي" — قل "سجلتها بقيود" لأن الفواتير تروح لنظام قيود فعلياً
+- رد مختصر ومفيد، المبالغ بالريال السعودي`,
     tools: agentTools,
   })
   if (!chatSessions.has(userId)) chatSessions.set(userId, model.startChat({ history: [] }))
@@ -499,18 +524,33 @@ async function agentProcess(userId, text, imageBuffer = null, mimeType = null) {
   let response = await chat.sendMessage(parts)
   let result = response.response
   let loops = 5
+  let pendingAction = null
   while (result.candidates?.[0]?.content?.parts?.some(p => p.functionCall) && loops-- > 0) {
     const fcs = result.candidates[0].content.parts.filter(p => p.functionCall)
     const frs = []
     for (const fc of fcs) {
-      try { const r = await executeAgentTool(fc.functionCall.name, fc.functionCall.args); frs.push({ functionResponse: { name: fc.functionCall.name, response: r } }) }
-      catch (e) { frs.push({ functionResponse: { name: fc.functionCall.name, response: { error: e.message } } }) }
+      try {
+        const r = await executeAgentTool(fc.functionCall.name, fc.functionCall.args)
+        // If tool needs confirmation, save it for later
+        if (r.needs_confirmation) {
+          pendingAction = { action: r.action, data: r.data }
+          frs.push({ functionResponse: { name: fc.functionCall.name, response: { message: 'اعرض البيانات على المستخدم واطلب تأكيده قبل التنفيذ. قله "أسجلها بقيود؟" أو "أنفذ العملية؟"' } } })
+        } else {
+          frs.push({ functionResponse: { name: fc.functionCall.name, response: r } })
+        }
+      } catch (e) { frs.push({ functionResponse: { name: fc.functionCall.name, response: { error: e.message } } }) }
     }
     response = await chat.sendMessage(frs)
     result = response.response
   }
+
+  // Save pending confirmation to Supabase if exists
+  if (pendingAction) {
+    await savePending(userId, pendingAction.action, pendingAction.data)
+  }
+
   const txt = result.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('\n') || 'ما قدرت أفهم طلبك'
-  await supabase.from('telegram_chats').insert([{ user_id: String(userId), role: 'user', content: text || '[صورة]' }, { user_id: String(userId), role: 'assistant', content: txt }])
+  await supabase.from('telegram_chats').insert([{ user_id: String(userId), role: 'user', content: text || '[صورة]' }, { user_id: String(userId), role: 'assistant', content: txt }]).catch(() => {})
   return txt
 }
 
@@ -526,27 +566,31 @@ app.post('/api/telegram/webhook', async (req, res) => {
 
     if (!isAllowed(userId)) { await tgSend(chatId, `⛔ عذراً ${firstName}، ما عندك صلاحية.\n\n🆔 رقمك: <code>${userId}</code>\nأرسله للمسؤول.`); return res.sendStatus(200) }
 
-    if (text === '/start') { await tgSend(chatId, `أهلاً ${firstName} 👋\n\nأنا <b>فاتِر</b> — مساعدك المحاسبي.\n\n🆔 رقمك: <code>${userId}</code>\n\nأقدر:\n• 📸 أقرأ فواتير وأسجلها\n• 🔍 أبحث عن فواتير وموردين\n• 📊 أعطيك ملخصات\n• 💳 أسوي سندات صرف\n\nكلمني بالعربي 😊`); return res.sendStatus(200) }
-    if (text === '/clear') { chatSessions.delete(userId); await tgSend(chatId, 'تم مسح المحادثة ✨'); return res.sendStatus(200) }
+    if (text === '/start') { await tgSend(chatId, `أهلاً ${firstName} 👋\n\nأنا <b>فاتِر</b> — مساعدك المحاسبي.\n\n🆔 رقمك: <code>${userId}</code>\n\nأقدر:\n• 📸 أقرأ فواتير وأسجلها بقيود\n• 🔍 أبحث عن فواتير وموردين بقيود\n• 📊 أعطيك ملخصات من قيود\n• 💳 أسوي سندات صرف بقيود\n\nكلمني بالعربي 😊`); return res.sendStatus(200) }
+    if (text === '/clear') { chatSessions.delete(userId); await clearPending(userId); await tgSend(chatId, 'تم مسح المحادثة ✨'); return res.sendStatus(200) }
     if (text === '/id') { await tgSend(chatId, `🆔 رقمك: <code>${userId}</code>`); return res.sendStatus(200) }
 
-    // Pending confirmation
-    if (pendingConfirmations.has(userId)) {
-      const pending = pendingConfirmations.get(userId)
-      if (/^(نعم|اي|ايه|اكيد|أكيد|yes|ok|تمام|سجل|سوي|نفذ)$/i.test(text.trim())) {
-        pendingConfirmations.delete(userId)
+    // Pending confirmation (stored in Supabase)
+    const pending = await getPending(userId)
+    if (pending) {
+      const isConfirm = /^(نعم|اي|ايه|اكيد|أكيد|yes|ok|تمام|سجل|سوي|نفذ|سجلها|نعم سجل|نعم سجلها)$/i.test(text.trim())
+      const isDeny = /^(لا|لأ|الغ|الغي|cancel|no)$/i.test(text.trim())
+
+      if (isConfirm) {
+        await clearPending(userId)
         await tgTyping(chatId)
         try {
           const r = await execConfirmed(pending.action, pending.data)
           if (r.success) {
-            if (pending.action === 'create_bill') await tgSend(chatId, `✅ تم تسجيل الفاتورة\n\n📋 رقم: ${r.bill_id}\n🏢 ${r.vendor}\n💰 ${r.total} ر.س`)
-            else await tgSend(chatId, `✅ تم سند الصرف\n\n🏢 ${r.vendor}\n💰 ${r.amount} ر.س\n🏦 ${r.account}`)
+            if (pending.action === 'create_bill') await tgSend(chatId, `✅ تم تسجيل الفاتورة بقيود\n\n📋 رقم بقيود: ${r.bill_id}\n🏢 المورد: ${r.vendor}\n💰 المبلغ: ${r.total} ر.س`)
+            else await tgSend(chatId, `✅ تم سند الصرف بقيود\n\n🏢 ${r.vendor}\n💰 ${r.amount} ر.س\n🏦 ${r.account}`)
           }
         } catch (e) { await tgSend(chatId, `❌ ${e.message}`) }
         return res.sendStatus(200)
       }
-      if (/^(لا|لأ|الغ|الغي|cancel|no)$/i.test(text.trim())) { pendingConfirmations.delete(userId); await tgSend(chatId, '⏹ تم الإلغاء.'); return res.sendStatus(200) }
-      pendingConfirmations.delete(userId)
+      if (isDeny) { await clearPending(userId); await tgSend(chatId, '⏹ تم الإلغاء.'); return res.sendStatus(200) }
+      // Not a confirmation — clear and process as new message
+      await clearPending(userId)
     }
 
     await tgTyping(chatId)
