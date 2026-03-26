@@ -448,8 +448,19 @@ async function executeAgentTool(name, args) {
         top_vendors: sorted.slice(0, 5).map(([name, s2]) => ({ name, ...s2 }))
       }
     }
-    case 'create_bill': return { needs_confirmation: true, action: 'create_bill', data: args }
-    case 'create_payment': return { needs_confirmation: true, action: 'create_payment', data: args }
+    case 'create_bill': {
+      // Execute directly — no confirmation needed
+      try {
+        const result = await execConfirmed('create_bill', args)
+        return result
+      } catch (e) { return { error: e.message } }
+    }
+    case 'create_payment': {
+      try {
+        const result = await execConfirmed('create_payment', args)
+        return result
+      } catch (e) { return { error: e.message } }
+    }
     case 'update_bill': {
       // Find the bill first
       let billId = args.bill_id
@@ -462,19 +473,22 @@ async function executeAgentTool(name, args) {
         args._bill_info = { id: found.id, reference: found.reference, vendor: found.contact?.name, total: found.total, status: found.status }
       }
       if (!billId) return { error: 'لازم تعطيني رقم الفاتورة أو المرجع' }
-      return { needs_confirmation: true, action: 'update_bill', data: args }
+      try {
+        const result = await execConfirmed('update_bill', args)
+        return result
+      } catch (e) { return { error: e.message } }
     }
     case 'delete_bill': {
       let billId = args.bill_id
       if (!billId && args.reference) {
-        const allBills = await getAllQoyodBills()
-        const found = allBills.find(b => (b.reference || '').includes(args.reference))
+        const found = await findBillByReference(args.reference)
         if (!found) return { error: `ما لقيت فاتورة بمرجع "${args.reference}"` }
-        billId = found.id
-        args.bill_id = billId
-        args._bill_info = { id: found.id, reference: found.reference, vendor: found.contact?.name, total: found.total }
+        args.bill_id = found.id
       }
-      return { needs_confirmation: true, action: 'delete_bill', data: args }
+      try {
+        const result = await execConfirmed('delete_bill', args)
+        return result
+      } catch (e) { return { error: e.message } }
     }
     case 'scan_invoice_image': return { needs_image: true, action: args.action || 'scan_only' }
     default: return { error: 'دالة غير معروفة' }
@@ -625,8 +639,10 @@ async function agentProcess(userId, text, imageBuffer = null, mimeType = null) {
 - ملخص شهري = استدعي get_monthly_summary
 - تعديل فاتورة = استدعي update_bill
 - حذف فاتورة = استدعي delete_bill
-- ⛔ لا تقل "تم" أو "سجلت" أو "سويت سند" إلا بعد ما تستدعي الأداة وتجيك نتيجة success
-- ⛔ لو ما استدعيت أداة = ما صار شيء بقيود. لا تكذب على المستخدم.
+- ⛔ لا تقل "تم" إلا بعد ما تستدعي الأداة وتجيك نتيجة success
+- ⛔ لو ما استدعيت أداة = ما صار شيء بقيود
+- ✅ نفّذ مباشرة بدون طلب تأكيد — الأدوات تنفّذ فوري
+- ✅ بعد التنفيذ أخبر المستخدم بالنتيجة
 
 التدفق الصحيح لتسجيل فاتورة:
 - المستخدم يرسل بيانات فاتورة (نص أو صورة)
