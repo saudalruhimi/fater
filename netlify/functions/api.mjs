@@ -319,6 +319,8 @@ const agentTools = [{
     { name: 'create_bill', description: 'إنشاء فاتورة مشتريات - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' }, invoice_number: { type: 'STRING' }, invoice_date: { type: 'STRING' }, total_amount: { type: 'NUMBER' }, items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { description: { type: 'STRING' }, quantity: { type: 'NUMBER' }, unit_price: { type: 'NUMBER' } } } } }, required: ['vendor_name', 'items'] } },
     { name: 'create_payment', description: 'إنشاء سند صرف - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' }, amount: { type: 'NUMBER' }, account_name: { type: 'STRING' }, date: { type: 'STRING' } }, required: ['vendor_name', 'amount'] } },
     { name: 'scan_invoice_image', description: 'قراءة صورة فاتورة', parameters: { type: 'OBJECT', properties: { action: { type: 'STRING' } } } },
+    { name: 'update_bill', description: 'تعديل فاتورة مشتريات موجودة بقيود (لازم تكون موافق عليها مو مدفوعة) - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود (id)' }, reference: { type: 'STRING', description: 'رقم المرجع للبحث' }, notes: { type: 'STRING' }, issue_date: { type: 'STRING' }, due_date: { type: 'STRING' }, items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { description: { type: 'STRING' }, quantity: { type: 'NUMBER' }, unit_price: { type: 'NUMBER' } } } } } } },
+    { name: 'delete_bill', description: 'حذف فاتورة مشتريات من قيود (لازم تكون موافق عليها مو مدفوعة) - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود' }, reference: { type: 'STRING', description: 'رقم المرجع للبحث' } } } },
   ]
 }]
 
@@ -433,6 +435,32 @@ async function executeAgentTool(name, args) {
     }
     case 'create_bill': return { needs_confirmation: true, action: 'create_bill', data: args }
     case 'create_payment': return { needs_confirmation: true, action: 'create_payment', data: args }
+    case 'update_bill': {
+      // Find the bill first
+      let billId = args.bill_id
+      if (!billId && args.reference) {
+        const allBills = await getAllQoyodBills()
+        const found = allBills.find(b => (b.reference || '').includes(args.reference))
+        if (!found) return { error: `ما لقيت فاتورة بمرجع "${args.reference}"` }
+        billId = found.id
+        args.bill_id = billId
+        args._bill_info = { id: found.id, reference: found.reference, vendor: found.contact?.name, total: found.total, status: found.status }
+      }
+      if (!billId) return { error: 'لازم تعطيني رقم الفاتورة أو المرجع' }
+      return { needs_confirmation: true, action: 'update_bill', data: args }
+    }
+    case 'delete_bill': {
+      let billId = args.bill_id
+      if (!billId && args.reference) {
+        const allBills = await getAllQoyodBills()
+        const found = allBills.find(b => (b.reference || '').includes(args.reference))
+        if (!found) return { error: `ما لقيت فاتورة بمرجع "${args.reference}"` }
+        billId = found.id
+        args.bill_id = billId
+        args._bill_info = { id: found.id, reference: found.reference, vendor: found.contact?.name, total: found.total }
+      }
+      return { needs_confirmation: true, action: 'delete_bill', data: args }
+    }
     case 'scan_invoice_image': return { needs_image: true, action: args.action || 'scan_only' }
     default: return { error: 'دالة غير معروفة' }
   }
@@ -473,6 +501,37 @@ async function execConfirmed(action, data) {
     if (!acc) throw new Error('ما لقيت حساب دفع مناسب')
     const payment = await qoyodRequest('POST', '/bill_payments', { bill_payment: { contact_id: vendor.id, account_id: acc.id, amount: data.amount, date: data.date || new Date().toISOString().split('T')[0], description: `سند صرف لـ ${vendor.name}` } })
     return { success: true, payment, vendor: vendor.name, amount: data.amount, account: acc.name }
+  }
+  if (action === 'update_bill') {
+    const billId = data.bill_id
+    if (!billId) throw new Error('رقم الفاتورة مفقود')
+    const updates = {}
+    if (data.notes) updates.notes = data.notes
+    if (data.issue_date) updates.issue_date = data.issue_date
+    if (data.due_date) updates.due_date = data.due_date
+    if (data.items?.length) {
+      const pd = await qoyodRequest('GET', '/products')
+      const prods = (pd.products || []).map(p => ({ ...p, name: p.name_ar || p.name_en || '' }))
+      const id2 = await qoyodRequest('GET', '/inventories')
+      const inv = (id2.inventories || [])[0]
+      updates.line_items = []
+      for (const item of data.items) {
+        const ps = (item.description || '').toLowerCase()
+        const m = prods.find(p => p.name.toLowerCase().includes(ps) || ps.includes(p.name.toLowerCase()))
+        if (!m) throw new Error(`ما لقيت بند بقيود يطابق "${item.description}"`)
+        updates.line_items.push({ product_id: m.id, description: item.description, quantity: item.quantity || 1, unit_price: item.unit_price || 0, tax_percent: 15, is_inclusive: true, inventory_id: inv?.id })
+      }
+    }
+    console.log('[UPDATE BILL]', billId, JSON.stringify(updates).slice(0, 300))
+    const result = await qoyodRequest('PUT', `/bills/${billId}`, { bill: updates })
+    return { success: true, bill_id: billId, updated: result?.bill || result }
+  }
+  if (action === 'delete_bill') {
+    const billId = data.bill_id
+    if (!billId) throw new Error('رقم الفاتورة مفقود')
+    console.log('[DELETE BILL]', billId)
+    await qoyodRequest('DELETE', `/bills/${billId}`)
+    return { success: true, bill_id: billId, message: 'تم حذف الفاتورة من قيود' }
   }
   throw new Error('إجراء غير معروف')
 }
@@ -594,10 +653,12 @@ app.post('/api/telegram/webhook', async (req, res) => {
           const r = await execConfirmed(pending.action, pending.data)
           console.log('[CONFIRM] Result:', JSON.stringify(r).slice(0, 300))
           if (r.success) {
-            if (pending.action === 'create_bill') await tgSend(chatId, `✅ تم تسجيل الفاتورة بقيود فعلياً\n\n📋 رقم بقيود: ${r.bill_id}\n🏢 المورد: ${r.vendor}\n💰 المبلغ: ${r.total} ر.س`)
-            else await tgSend(chatId, `✅ تم سند الصرف بقيود فعلياً\n\n🏢 ${r.vendor}\n💰 ${r.amount} ر.س\n🏦 ${r.account}`)
+            if (pending.action === 'create_bill') await tgSend(chatId, `✅ تم تسجيل الفاتورة بقيود\n\n📋 رقم بقيود: ${r.bill_id}\n🏢 المورد: ${r.vendor}\n💰 المبلغ: ${r.total} ر.س`)
+            else if (pending.action === 'update_bill') await tgSend(chatId, `✅ تم تعديل الفاتورة بقيود\n\n📋 رقم: ${r.bill_id}`)
+            else if (pending.action === 'delete_bill') await tgSend(chatId, `✅ تم حذف الفاتورة من قيود\n\n📋 رقم: ${r.bill_id}`)
+            else await tgSend(chatId, `✅ تم سند الصرف بقيود\n\n🏢 ${r.vendor}\n💰 ${r.amount} ر.س\n🏦 ${r.account}`)
           } else {
-            await tgSend(chatId, `❌ فشل التسجيل: ${JSON.stringify(r)}`)
+            await tgSend(chatId, `❌ فشل: ${JSON.stringify(r)}`)
           }
         } catch (e) {
           console.error('[CONFIRM] Error:', e.message)
