@@ -550,7 +550,7 @@ async function agentProcess(userId, text, imageBuffer = null, mimeType = null) {
   }
 
   const txt = result.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('\n') || 'ما قدرت أفهم طلبك'
-  await supabase.from('telegram_chats').insert([{ user_id: String(userId), role: 'user', content: text || '[صورة]' }, { user_id: String(userId), role: 'assistant', content: txt }]).catch(() => {})
+  try { await supabase.from('telegram_chats').insert([{ user_id: String(userId), role: 'user', content: text || '[صورة]' }, { user_id: String(userId), role: 'assistant', content: txt }]) } catch {}
   return txt
 }
 
