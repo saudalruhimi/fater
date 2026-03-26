@@ -91,6 +91,117 @@ function levenshtein(a, b) {
   return m[a.length][b.length]
 }
 
+// ============ Smart Matching ============
+
+// Find best vendor match (exact → fuzzy → partial word)
+async function smartFindVendor(name) {
+  const vd = await qoyodRequest('GET', '/vendors')
+  const vendors = vd.contacts || vd.vendors || []
+  if (!vendors.length) throw new Error('ما فيه موردين بقيود')
+  const search = normalize(name)
+
+  // 1. Exact match
+  const exact = vendors.find(v => normalize(v.name) === search)
+  if (exact) return exact
+
+  // 2. Includes match
+  const includes = vendors.find(v => normalize(v.name).includes(search) || search.includes(normalize(v.name)))
+  if (includes) return includes
+
+  // 3. Word overlap — count matching words
+  const searchWords = search.split(/\s+/).filter(w => w.length > 2)
+  let bestVendor = null, bestScore = 0
+  for (const v of vendors) {
+    const vName = normalize(v.name + ' ' + (v.organization || ''))
+    let score = 0
+    for (const w of searchWords) {
+      if (vName.includes(w)) score++
+    }
+    if (score > bestScore) { bestScore = score; bestVendor = v }
+  }
+  if (bestVendor && bestScore >= 1) return bestVendor
+
+  // 4. Levenshtein — closest name
+  let bestDist = Infinity
+  for (const v of vendors) {
+    const dist = levenshtein(normalize(v.name), search)
+    if (dist < bestDist) { bestDist = dist; bestVendor = v }
+  }
+  if (bestDist < 15) return bestVendor
+
+  throw new Error(`ما لقيت مورد قريب من "${name}"`)
+}
+
+// Find best product match (dictionary → fuzzy → AI)
+async function smartFindProduct(itemDesc, vendorName) {
+  const pd = await qoyodRequest('GET', '/products')
+  const products = (pd.products || []).map(p => ({ ...p, name: p.name_ar || p.name_en || '' }))
+  const desc = normalize(itemDesc)
+
+  // 1. Check dictionary (saved mappings)
+  const { data: mappings } = await supabase.from('item_mappings').select('*')
+  if (mappings?.length) {
+    const exactMap = mappings.find(m => normalize(m.vendor_item_name) === desc)
+    if (exactMap) {
+      const p = products.find(x => x.id === exactMap.qoyod_product_id)
+      if (p) return p
+    }
+    // Fuzzy dictionary
+    const fuzzyMap = mappings.find(m => levenshtein(normalize(m.vendor_item_name), desc) < 5)
+    if (fuzzyMap) {
+      const p = products.find(x => x.id === fuzzyMap.qoyod_product_id)
+      if (p) return p
+    }
+  }
+
+  // 2. Direct product match (includes)
+  const direct = products.find(p => normalize(p.name).includes(desc) || desc.includes(normalize(p.name)))
+  if (direct) return direct
+
+  // 3. Word overlap
+  const words = desc.split(/\s+/).filter(w => w.length > 2)
+  let bestProd = null, bestScore = 0
+  for (const p of products) {
+    const pName = normalize(p.name)
+    let score = 0
+    for (const w of words) {
+      if (pName.includes(w)) score++
+    }
+    if (score > bestScore) { bestScore = score; bestProd = p }
+  }
+  if (bestProd && bestScore >= 1) return bestProd
+
+  // 4. Levenshtein
+  let bestDist = Infinity
+  for (const p of products) {
+    const dist = levenshtein(normalize(p.name), desc)
+    if (dist < bestDist) { bestDist = dist; bestProd = p }
+  }
+  if (bestProd && bestDist < 10) return bestProd
+
+  // 5. AI match — ask Gemini
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const productList = products.map(p => `${p.id}: ${p.name}`).join('\n')
+    const prompt = `عندي بند في فاتورة اسمه "${itemDesc}" من مورد "${vendorName}". وعندي هالبنود:\n${productList}\nوش أقرب بند؟ رجع JSON فقط: {"product_id": 0, "product_name": ""}`
+    const r = await model.generateContent(prompt)
+    const text = r.response.text()
+    const jm = text.match(/```json\s*([\s\S]*?)```/) || text.match(/\{[\s\S]*\}/)
+    if (jm) {
+      const ai = JSON.parse(jm[1] || jm[0])
+      if (ai.product_id) {
+        const p = products.find(x => x.id === ai.product_id)
+        if (p) return p
+      }
+    }
+  } catch {}
+
+  // 6. Last resort — return closest
+  if (bestProd) return bestProd
+  throw new Error(`ما لقيت بند بقيود يطابق "${itemDesc}"`)
+}
+
 // ============ Routes ============
 
 // POST /api/scan
@@ -498,21 +609,18 @@ async function executeAgentTool(name, args) {
 // Execute confirmed action
 async function execConfirmed(action, data) {
   if (action === 'create_bill') {
-    const vd = await qoyodRequest('GET', '/vendors')
-    const vendors = vd.contacts || vd.vendors || []
-    const vendor = vendors.find(v => (v.name || '').toLowerCase().includes((data.vendor_name || '').toLowerCase()))
-    if (!vendor) throw new Error(`ما لقيت مورد باسم "${data.vendor_name}"`)
+    // Smart vendor matching
+    const vendor = await smartFindVendor(data.vendor_name)
     const id = await qoyodRequest('GET', '/inventories')
     const inv = (id.inventories || [])[0]
     if (!inv) throw new Error('ما فيه مخزن بقيود')
-    const pd = await qoyodRequest('GET', '/products')
-    const prods = (pd.products || []).map(p => ({ ...p, name: p.name_ar || p.name_en || '' }))
+    // Smart product matching for each item
     const line_items = []
     for (const item of data.items || []) {
-      const ps = (item.description || '').toLowerCase()
-      const m = prods.find(p => p.name.toLowerCase().includes(ps) || ps.includes(p.name.toLowerCase()))
-      if (!m) throw new Error(`ما لقيت بند بقيود يطابق "${item.description}"`)
-      line_items.push({ product_id: m.id, description: item.description, quantity: item.quantity || 1, unit_price: item.unit_price || 0, tax_percent: 15, is_inclusive: true })
+      const product = await smartFindProduct(item.description, data.vendor_name)
+      line_items.push({ product_id: product.id, description: item.description, quantity: item.quantity || 1, unit_price: item.unit_price || 0, tax_percent: 15, is_inclusive: true })
+      // Save mapping for future
+      try { await supabase.from('item_mappings').insert({ vendor_item_name: item.description, qoyod_product_id: product.id, qoyod_product_name: product.name, vendor_name: data.vendor_name }) } catch {}
     }
     const bill = await qoyodRequest('POST', '/bills', { bill: { contact_id: vendor.id, status: 'Approved', issue_date: data.invoice_date || new Date().toISOString().split('T')[0], due_date: data.invoice_date || new Date().toISOString().split('T')[0], reference: data.invoice_number || '', inventory_id: inv.id, line_items } })
     await supabase.from('processed_invoices').insert({ vendor_name: vendor.name, invoice_number: data.invoice_number, invoice_date: data.invoice_date, total_amount: data.total_amount, qoyod_bill_id: bill?.bill?.id, status: 'pushed' })
@@ -530,16 +638,16 @@ async function execConfirmed(action, data) {
       else throw new Error(`ما لقيت فاتورة بمرجع "${data.reference}"`)
     }
 
-    // Search by vendor name (slower)
+    // Search by vendor name (smart match → find unpaid bills)
     if (!billId && vendorName) {
+      const vendor = await smartFindVendor(vendorName)
+      vendorName = vendor.name
       const allBills = await getAllQoyodBills()
-      const s = vendorName.toLowerCase()
       const vendorBills = allBills.filter(b =>
-        (b.contact?.name || '').toLowerCase().includes(s) && Number(b.due_amount || 0) > 0
+        b.contact?.id === vendor.id && Number(b.due_amount || 0) > 0
       ).sort((a, b) => a.issue_date?.localeCompare(b.issue_date))
-      if (!vendorBills.length) throw new Error(`ما لقيت فواتير غير مدفوعة لـ "${vendorName}"`)
+      if (!vendorBills.length) throw new Error(`ما لقيت فواتير غير مدفوعة لـ "${vendor.name}"`)
       billId = vendorBills[0].id
-      vendorName = vendorBills[0].contact?.name || vendorName
     }
     if (!billId) throw new Error('لازم تعطيني اسم المورد أو رقم الفاتورة')
 
