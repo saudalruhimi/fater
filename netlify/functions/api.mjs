@@ -479,12 +479,16 @@ async function execConfirmed(action, data) {
 
 // Pending confirmations stored in Supabase (survives serverless cold starts)
 async function savePending(userId, action, data) {
-  await supabase.from('telegram_chats').upsert({ user_id: String(userId), role: 'pending_action', content: JSON.stringify({ action, data, ts: Date.now() }) }, { onConflict: 'user_id,role' })
+  // Delete any existing pending first, then insert new one
+  await supabase.from('telegram_chats').delete().eq('user_id', String(userId)).eq('role', 'pending_action')
+  const { error } = await supabase.from('telegram_chats').insert({ user_id: String(userId), role: 'pending_action', content: JSON.stringify({ action, data, ts: Date.now() }) })
+  console.log('[savePending]', userId, action, error ? 'ERROR: ' + error.message : 'OK')
 }
 async function getPending(userId) {
-  const { data } = await supabase.from('telegram_chats').select('content').eq('user_id', String(userId)).eq('role', 'pending_action').single()
-  if (!data?.content) return null
-  try { const p = JSON.parse(data.content); if (Date.now() - p.ts > 600000) return null; return p } catch { return null }
+  const { data, error } = await supabase.from('telegram_chats').select('content').eq('user_id', String(userId)).eq('role', 'pending_action').order('created_at', { ascending: false }).limit(1)
+  console.log('[getPending]', userId, data?.length ? 'FOUND' : 'NONE', error?.message || '')
+  if (!data?.length || !data[0]?.content) return null
+  try { const p = JSON.parse(data[0].content); if (Date.now() - p.ts > 600000) return null; return p } catch { return null }
 }
 async function clearPending(userId) {
   await supabase.from('telegram_chats').delete().eq('user_id', String(userId)).eq('role', 'pending_action')
@@ -583,15 +587,22 @@ app.post('/api/telegram/webhook', async (req, res) => {
       const isDeny = /^(لا|لأ|الغ|الغي|cancel|no)$/i.test(text.trim())
 
       if (isConfirm) {
+        console.log('[CONFIRM] Executing:', pending.action, JSON.stringify(pending.data).slice(0, 200))
         await clearPending(userId)
         await tgTyping(chatId)
         try {
           const r = await execConfirmed(pending.action, pending.data)
+          console.log('[CONFIRM] Result:', JSON.stringify(r).slice(0, 300))
           if (r.success) {
-            if (pending.action === 'create_bill') await tgSend(chatId, `✅ تم تسجيل الفاتورة بقيود\n\n📋 رقم بقيود: ${r.bill_id}\n🏢 المورد: ${r.vendor}\n💰 المبلغ: ${r.total} ر.س`)
-            else await tgSend(chatId, `✅ تم سند الصرف بقيود\n\n🏢 ${r.vendor}\n💰 ${r.amount} ر.س\n🏦 ${r.account}`)
+            if (pending.action === 'create_bill') await tgSend(chatId, `✅ تم تسجيل الفاتورة بقيود فعلياً\n\n📋 رقم بقيود: ${r.bill_id}\n🏢 المورد: ${r.vendor}\n💰 المبلغ: ${r.total} ر.س`)
+            else await tgSend(chatId, `✅ تم سند الصرف بقيود فعلياً\n\n🏢 ${r.vendor}\n💰 ${r.amount} ر.س\n🏦 ${r.account}`)
+          } else {
+            await tgSend(chatId, `❌ فشل التسجيل: ${JSON.stringify(r)}`)
           }
-        } catch (e) { await tgSend(chatId, `❌ ${e.message}`) }
+        } catch (e) {
+          console.error('[CONFIRM] Error:', e.message)
+          await tgSend(chatId, `❌ خطأ بالتسجيل بقيود: ${e.message}`)
+        }
         return res.sendStatus(200)
       }
       if (isDeny) { await clearPending(userId); await tgSend(chatId, '⏹ تم الإلغاء.'); return res.sendStatus(200) }
