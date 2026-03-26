@@ -64,7 +64,8 @@ function UploadStep({ onScanned }) {
       const results = []
       for (const f of files) {
         const result = await scanInvoice(f.file)
-        results.push(result.data)
+        // Attach image preview URL to scanned data
+        results.push({ ...result.data, _previewUrl: f.url || null })
       }
       onScanned(results)
     } catch (e) {
@@ -212,6 +213,7 @@ function MatchStep({ data, products, vendors, onPush, onBack }) {
   const [dueDate, setDueDate] = useState(data.due_date || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [showPreview, setShowPreview] = useState(false)
 
   const updateItem = (idx, field, value) => {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
@@ -262,8 +264,36 @@ function MatchStep({ data, products, vendors, onPush, onBack }) {
 
   return (
     <div className="space-y-5">
-      {/* Header info */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Invoice preview + Header info */}
+      <div className={`grid gap-4 ${data._previewUrl ? 'grid-cols-1 lg:grid-cols-[200px_1fr]' : 'grid-cols-1'}`}>
+        {/* Image preview thumbnail */}
+        {data._previewUrl && (
+          <>
+            <div className="bg-white rounded-2xl border border-border-light p-2 flex flex-col items-center cursor-pointer hover:border-primary/30 transition-all"
+              onClick={() => setShowPreview(true)}>
+              <img src={data._previewUrl} alt="الفاتورة" className="w-full rounded-xl object-contain max-h-[240px]" />
+              <p className="text-[10px] text-text-muted mt-2 flex items-center gap-1">
+                <Image className="w-3 h-3" /> اضغط للتكبير
+              </p>
+            </div>
+
+            {/* Full preview modal */}
+            {showPreview && (
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                onClick={() => setShowPreview(false)}>
+                <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-2xl p-2 shadow-2xl" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setShowPreview(false)}
+                    className="absolute -top-3 -left-3 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-text-muted hover:text-red-500 transition-colors z-10">
+                    <X className="w-4 h-4" />
+                  </button>
+                  <img src={data._previewUrl} alt="الفاتورة" className="max-h-[85vh] rounded-xl object-contain" />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3">
         <div>
           <label className="block text-[12px] font-medium text-text-muted mb-1">المورد</label>
           <SearchableSelect
@@ -291,6 +321,7 @@ function MatchStep({ data, products, vendors, onPush, onBack }) {
           <label className="block text-[12px] font-medium text-text-muted mb-1">تاريخ الاستحقاق</label>
           <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
             className="w-full bg-white border border-border-light rounded-xl py-2 px-3 text-sm text-text focus:outline-none focus:border-primary/50" dir="ltr" />
+        </div>
         </div>
       </div>
 
