@@ -15,11 +15,19 @@
   --color-text: #1F2937;
   --color-text-secondary: #6B7280;
   --color-text-muted: #9CA3AF;
-  --font-family-sans: 'IBM Plex Sans Arabic', sans-serif;
+  --font-family-sans: 'Tajawal', sans-serif;
+}
+
+@font-face {
+  font-family: 'Rikaz';
+  src: url('/src/assets/FONTS/RIKAZ.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
 }
 
 * {
-  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-family: 'Tajawal', sans-serif;
   font-variant-numeric: tabular-nums;
 }
 
@@ -63,4 +71,153 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #9CA3AF;
+}
+
+/* ============ Motion System ============ */
+
+/* Easing curves */
+:root {
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Page entrance — staggered fade+slide */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Page content entrance */
+.animate-page > * {
+  animation: fadeSlideUp 0.5s var(--ease-out-quart) both;
+}
+.animate-page > *:nth-child(1) { animation-delay: 0.05s; }
+.animate-page > *:nth-child(2) { animation-delay: 0.1s; }
+.animate-page > *:nth-child(3) { animation-delay: 0.15s; }
+.animate-page > *:nth-child(4) { animation-delay: 0.2s; }
+.animate-page > *:nth-child(5) { animation-delay: 0.25s; }
+.animate-page > *:nth-child(6) { animation-delay: 0.3s; }
+
+/* Cards — hover lift */
+.card-hover {
+  transition: transform 0.25s var(--ease-out-quart), box-shadow 0.25s var(--ease-out-quart);
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.06);
+}
+
+/* Buttons — press feedback */
+button, [role="button"] {
+  transition: transform 0.12s var(--ease-out-quart), background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+button:active:not(:disabled), [role="button"]:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Links in nav — smooth color */
+a, .nav-link {
+  transition: color 0.2s, background-color 0.2s;
+}
+
+/* Inputs — smooth focus */
+input, textarea, select {
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+
+/* Tables rows — hover highlight */
+tr {
+  transition: background-color 0.15s;
+}
+
+/* Badges and pills */
+.badge-pulse {
+  animation: badgePulse 2s ease-in-out infinite;
+}
+@keyframes badgePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Modal overlay */
+.modal-overlay {
+  animation: fadeIn 0.2s var(--ease-out-quart);
+}
+.modal-content {
+  animation: scaleIn 0.3s var(--ease-out-expo);
+}
+
+/* Sidebar */
+.sidebar-enter {
+  animation: slideInLeft 0.3s var(--ease-out-expo);
+}
+
+/* Toast / notifications */
+.toast-enter {
+  animation: slideInRight 0.35s var(--ease-out-expo);
+}
+
+/* Success checkmark */
+@keyframes checkDraw {
+  from { stroke-dashoffset: 20; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Skeleton loading shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #F3F4F6 25%, #E5E7EB 50%, #F3F4F6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+/* Stat number count-up feel */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.stat-value {
+  animation: countUp 0.6s var(--ease-out-quart) both;
+}
+
+/* Dropdown menu */
+@keyframes dropdownOpen {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.dropdown-menu {
+  animation: dropdownOpen 0.2s var(--ease-out-quart);
+}
+
+/* Reduced motion — respect accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

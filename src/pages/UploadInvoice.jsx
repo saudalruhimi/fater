@@ -27,8 +27,9 @@ function UploadStep({ onScanned }) {
       .map((f) => ({
         file: f,
         id: crypto.randomUUID(),
-        url: f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
+        url: URL.createObjectURL(f),
         isImage: f.type.startsWith('image/'),
+        isPdf: f.type === 'application/pdf',
       }))
     setFiles((prev) => [...prev, ...mapped])
     setError(null)
@@ -65,7 +66,7 @@ function UploadStep({ onScanned }) {
       for (const f of files) {
         const result = await scanInvoice(f.file)
         // Attach image preview URL to scanned data
-        results.push({ ...result.data, _previewUrl: f.url || null })
+        results.push({ ...result.data, _previewUrl: f.url || null, _isPdf: f.isPdf || false })
       }
       onScanned(results)
     } catch (e) {
@@ -269,9 +270,15 @@ function MatchStep({ data, products, vendors, onPush, onBack }) {
         {/* Image preview thumbnail */}
         {data._previewUrl && (
           <>
-            <div className="bg-white rounded-2xl border border-border-light p-2 flex flex-col items-center cursor-pointer hover:border-primary/30 transition-all"
+            <div className="bg-white rounded-2xl border border-border-light p-2 flex flex-col items-center cursor-pointer hover:border-primary/30 transition-all card-hover"
               onClick={() => setShowPreview(true)}>
-              <img src={data._previewUrl} alt="الفاتورة" className="w-full rounded-xl object-contain max-h-[240px]" />
+              {data._isPdf ? (
+                <div className="w-full h-[240px] rounded-xl overflow-hidden">
+                  <iframe src={data._previewUrl} className="w-full h-full border-0 rounded-xl pointer-events-none" title="معاينة الفاتورة" />
+                </div>
+              ) : (
+                <img src={data._previewUrl} alt="الفاتورة" className="w-full rounded-xl object-contain max-h-[240px]" />
+              )}
               <p className="text-[10px] text-text-muted mt-2 flex items-center gap-1">
                 <Image className="w-3 h-3" /> اضغط للتكبير
               </p>
@@ -279,14 +286,18 @@ function MatchStep({ data, products, vendors, onPush, onBack }) {
 
             {/* Full preview modal */}
             {showPreview && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay"
                 onClick={() => setShowPreview(false)}>
-                <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-2xl p-2 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="relative max-w-4xl w-full max-h-[90vh] bg-white rounded-2xl p-2 shadow-2xl modal-content" onClick={e => e.stopPropagation()}>
                   <button onClick={() => setShowPreview(false)}
                     className="absolute -top-3 -left-3 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-text-muted hover:text-red-500 transition-colors z-10">
                     <X className="w-4 h-4" />
                   </button>
-                  <img src={data._previewUrl} alt="الفاتورة" className="max-h-[85vh] rounded-xl object-contain" />
+                  {data._isPdf ? (
+                    <iframe src={data._previewUrl} className="w-full h-[85vh] border-0 rounded-xl" title="معاينة الفاتورة" />
+                  ) : (
+                    <img src={data._previewUrl} alt="الفاتورة" className="max-h-[85vh] rounded-xl object-contain" />
+                  )}
                 </div>
               </div>
             )}
@@ -554,7 +565,7 @@ export default function UploadInvoice() {
   }
 
   return (
-    <div className="max-w-5xl">
+    <div className="max-w-5xl animate-page">
       <div className="mb-6 sm:mb-8">
         <h1 className="text-lg sm:text-xl font-bold text-text">رفع الفواتير</h1>
         <p className="text-xs sm:text-sm text-text-muted mt-1">

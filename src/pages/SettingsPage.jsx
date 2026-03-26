@@ -6,17 +6,26 @@ import {
 import { useState, useEffect } from 'react'
 import { testQoyodConnection, updateQoyodKey } from '../lib/api'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
-// Helper: load or create settings row
-async function loadSettings() {
-  const { data } = await supabase.from('user_settings').select('*').limit(1).single()
+// Helper: load or create settings row PER USER
+async function loadSettings(username) {
+  if (!username) username = 'saud'
+  const { data } = await supabase.from('user_settings').select('*').eq('profile_username', username).single()
   if (data) return data
-  const { data: created } = await supabase.from('user_settings').insert({}).select().single()
+  // Check if there's a row without username (legacy) — claim it for saud
+  const { data: legacy } = await supabase.from('user_settings').select('*').is('profile_username', null).limit(1).single()
+  if (legacy && username === 'saud') {
+    await supabase.from('user_settings').update({ profile_username: 'saud' }).eq('id', legacy.id)
+    return { ...legacy, profile_username: 'saud' }
+  }
+  // Create new row for this user
+  const { data: created } = await supabase.from('user_settings').insert({ profile_username: username }).select().single()
   return created
 }
 
-async function saveSettings(updates) {
-  const settings = await loadSettings()
+async function saveSettings(updates, username) {
+  const settings = await loadSettings(username)
   await supabase.from('user_settings').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', settings.id)
 }
 
@@ -74,6 +83,30 @@ function InputField({ label, icon: Icon, ...props }) {
   )
 }
 
+// View-only integration status for non-admin users
+function IntegrationsViewOnly() {
+  const [status, setStatus] = useState(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => { testQoyodConnection().then(d => setStatus(d)).finally(() => setLoading(false)) }, [])
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <img src="/qoyod.png" alt="قيود" className="w-8 h-8 rounded-lg" />
+        <h2 className="text-base font-bold text-text">حالة الربط</h2>
+      </div>
+      {loading ? <p className="text-sm text-text-muted">جارِ الفحص...</p> : (
+        <div className={`flex items-center gap-3 p-4 rounded-xl border ${status?.connected ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+          {status?.connected ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <XCircle className="w-5 h-5 text-red-500" />}
+          <div>
+            <p className="text-sm font-semibold text-text">{status?.connected ? 'متصل بقيود' : 'غير متصل'}</p>
+            {status?.connected && <p className="text-xs text-text-muted mt-0.5">البنود: {status.products_count} · الموردين: {status.vendors_count}</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function IntegrationsTab() {
   const [status, setStatus] = useState('checking')
   const [testing, setTesting] = useState(false)
@@ -123,9 +156,7 @@ function IntegrationsTab() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 sm:p-6 border-b border-border-light">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-[#1a1a2e] flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-sm">Q</span>
-            </div>
+            <img src="/qoyod.png" alt="قيود" className="w-11 h-11 rounded-xl flex-shrink-0" />
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-[14px] font-semibold text-text">قيود</h3>
@@ -312,19 +343,21 @@ function IntegrationsTab() {
 }
 
 function ProfileTab() {
+  const { user } = useAuth()
   const [form, setForm] = useState({ name: '', email: '', phone: '', role: '' })
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadSettings().then((s) => {
+    loadSettings(user?.username).then((s) => {
       if (s) setForm({ name: s.profile_name || '', email: s.profile_email || '', phone: s.profile_phone || '', role: s.profile_role || '' })
     }).finally(() => setLoading(false))
-  }, [])
+  }, [user])
 
   const handleSave = async () => {
-    await saveSettings({ profile_name: form.name, profile_email: form.email, profile_phone: form.phone, profile_role: form.role })
+    await saveSettings({ profile_name: form.name, profile_email: form.email, profile_phone: form.phone, profile_role: form.role }, user?.username)
     setSaved(true)
+    window.dispatchEvent(new Event('profile-updated'))
     setTimeout(() => setSaved(false), 2000)
   }
 
@@ -371,18 +404,19 @@ function ProfileTab() {
 }
 
 function CompanyTab() {
+  const { user } = useAuth()
   const [form, setForm] = useState({ companyName: '', cr: '', vat: '', city: '', address: '' })
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadSettings().then((s) => {
+    loadSettings(user?.username).then((s) => {
       if (s) setForm({ companyName: s.company_name || '', cr: s.company_cr || '', vat: s.company_vat || '', city: s.company_city || '', address: s.company_address || '' })
     }).finally(() => setLoading(false))
-  }, [])
+  }, [user])
 
   const handleSave = async () => {
-    await saveSettings({ company_name: form.companyName, company_cr: form.cr, company_vat: form.vat, company_city: form.city, company_address: form.address })
+    await saveSettings({ company_name: form.companyName, company_cr: form.cr, company_vat: form.vat, company_city: form.city, company_address: form.address }, user?.username)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -428,8 +462,10 @@ function NotificationsTab() {
   })
   const [loading, setLoading] = useState(true)
 
+  const { user } = useAuth()
+
   useEffect(() => {
-    loadSettings().then((s) => {
+    loadSettings(user?.username).then((s) => {
       if (s) setSettings({
         emailOnSuccess: s.notif_email_success ?? true,
         emailOnFail: s.notif_email_fail ?? true,
@@ -438,13 +474,13 @@ function NotificationsTab() {
         soundNotif: s.notif_sound ?? false,
       })
     }).finally(() => setLoading(false))
-  }, [])
+  }, [user])
 
   const update = (key) => {
     const newVal = !settings[key]
     setSettings((s) => ({ ...s, [key]: newVal }))
     const dbKey = { emailOnSuccess: 'notif_email_success', emailOnFail: 'notif_email_fail', emailDigest: 'notif_email_digest', browserNotif: 'notif_browser', soundNotif: 'notif_sound' }[key]
-    if (dbKey) saveSettings({ [dbKey]: newVal })
+    if (dbKey) saveSettings({ [dbKey]: newVal }, user?.username)
   }
 
   if (loading) return <div className="flex justify-center py-12"><RefreshCw className="w-5 h-5 text-primary animate-spin" /></div>
@@ -494,18 +530,19 @@ function NotificationsTab() {
 }
 
 function AppearanceTab() {
+  const { user } = useAuth()
   const [lang, setLang] = useState('ar')
   const [density, setDensity] = useState('comfortable')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadSettings().then((s) => {
+    loadSettings(user?.username).then((s) => {
       if (s) {
         setLang(s.appearance_lang || 'ar')
         setDensity(s.appearance_density || 'comfortable')
       }
     }).finally(() => setLoading(false))
-  }, [])
+  }, [user])
 
   const densityOptions = [
     { key: 'compact', label: 'مضغوط' },
@@ -520,7 +557,7 @@ function AppearanceTab() {
           {[{ key: 'ar', label: 'العربية', flag: '🇸🇦' }, { key: 'en', label: 'English', flag: '🇺🇸' }].map((l) => (
             <button
               key={l.key}
-              onClick={() => { setLang(l.key); saveSettings({ appearance_lang: l.key }) }}
+              onClick={() => { setLang(l.key); saveSettings({ appearance_lang: l.key }, user?.username) }}
               className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border text-[13px] font-medium transition-all flex-1 sm:flex-none ${
                 lang === l.key
                   ? 'border-primary bg-primary-50 text-primary-dark'
@@ -540,7 +577,7 @@ function AppearanceTab() {
           {densityOptions.map((d) => (
             <button
               key={d.key}
-              onClick={() => { setDensity(d.key); saveSettings({ appearance_density: d.key }) }}
+              onClick={() => { setDensity(d.key); saveSettings({ appearance_density: d.key }, user?.username) }}
               className={`px-4 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
                 density === d.key
                   ? 'bg-primary-50 text-primary-dark border border-primary/20'
@@ -578,10 +615,13 @@ function AppearanceTab() {
 }
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState('integrations')
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
+  const availableTabs = isAdmin ? TABS : TABS.filter(t => ['profile', 'appearance', 'integrations'].includes(t.key))
+  const [activeTab, setActiveTab] = useState(isAdmin ? 'integrations' : 'profile')
 
   const ActiveComponent = {
-    integrations: IntegrationsTab,
+    integrations: isAdmin ? IntegrationsTab : IntegrationsViewOnly,
     profile: ProfileTab,
     company: CompanyTab,
     notifications: NotificationsTab,
@@ -589,7 +629,7 @@ export default function SettingsPage() {
   }[activeTab]
 
   return (
-    <div className="max-w-5xl">
+    <div className="max-w-5xl animate-page">
       <div className="mb-6 sm:mb-8">
         <h1 className="text-lg sm:text-xl font-bold text-text">الإعدادات</h1>
         <p className="text-xs sm:text-sm text-text-muted mt-1">إدارة حسابك وتفضيلات النظام</p>
@@ -599,7 +639,7 @@ export default function SettingsPage() {
         {/* Side tabs — horizontal on mobile, vertical on desktop */}
         <div className="lg:w-48 flex-shrink-0">
           <div className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0 bg-white lg:bg-white rounded-2xl lg:border border-border-light lg:p-2">
-            {TABS.map((t) => (
+            {availableTabs.map((t) => (
               <button
                 key={t.key}
                 onClick={() => setActiveTab(t.key)}

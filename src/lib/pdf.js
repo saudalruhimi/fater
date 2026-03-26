@@ -158,7 +158,7 @@ export function exportHistoryPDF(invoices) {
   </head><body>
     <div class="header">
       <div>
-        <div class="logo">AI SCAN</div>
+        <div class="logo">رصد | RASAD</div>
         <div class="subtitle">قارئ الفواتير الذكي</div>
       </div>
       <div class="info">
@@ -188,7 +188,7 @@ export function exportHistoryPDF(invoices) {
     <div class="total-row"><span>الإجمالي شامل الضريبة</span><span class="num">${fmt(totalAmount)} ر.س</span></div>
 
     <div class="footer">
-      <span>AI SCAN - قارئ الفواتير الذكي</span>
+      <span>رصد | RASAD - قارئ الفواتير الذكي</span>
       <span>${new Date().toLocaleString('en-CA')}</span>
     </div>
   </body></html>`
@@ -219,7 +219,7 @@ export function exportInvoiceDetailPDF(invoice) {
   </head><body>
     <div class="header">
       <div>
-        <div class="logo">AI SCAN</div>
+        <div class="logo">رصد | RASAD</div>
         <div class="subtitle">قارئ الفواتير الذكي</div>
       </div>
       <div class="info">
@@ -257,7 +257,7 @@ export function exportInvoiceDetailPDF(invoice) {
     <div class="total-row"><span>الإجمالي شامل الضريبة</span><span class="num">${fmt(totalAmount)} ر.س</span></div>
 
     <div class="footer">
-      <span>AI SCAN - قارئ الفواتير الذكي</span>
+      <span>رصد | RASAD - قارئ الفواتير الذكي</span>
       <span>${new Date().toLocaleString('en-CA')}</span>
     </div>
   </body></html>`

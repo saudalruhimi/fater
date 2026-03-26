@@ -106,7 +106,7 @@ export default function Payments() {
   const selectedInvoice = invoices.find(i => i.qoyod_bill_id === form.bill_id)
 
   return (
-    <div className="max-w-5xl">
+    <div className="max-w-5xl animate-page">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
         <div>
           <h1 className="text-lg sm:text-xl font-bold text-text">سندات الصرف</h1>

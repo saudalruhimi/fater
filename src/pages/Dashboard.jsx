@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { testQoyodConnection } from '../lib/api'
+import { useAuth } from '../contexts/AuthContext'
 
 const statusConfig = {
   scanned: { label: 'ممسوحة', bg: 'bg-blue-50 text-blue-700' },
@@ -70,43 +71,20 @@ function QoyodStatus() {
   const c = config[status]
 
   return (
-    <div className={`flex items-center justify-between gap-3 mb-5 px-4 py-3 rounded-xl border ${c.border} ${c.bg} transition-all`}>
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-8 h-8 rounded-lg bg-white border border-border-light flex items-center justify-center flex-shrink-0">
-          <Plug className="w-4 h-4 text-text-muted" strokeWidth={1.6} />
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] font-semibold text-text">قيود</span>
-            <span className="text-[11px] text-text-muted hidden sm:inline">— النظام المحاسبي</span>
-          </div>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${c.dot}`} />
-            <span className={`text-[11px] font-medium ${c.text}`}>{c.label}</span>
-            {status === 'connected' && (
-              <span className="text-[10px] text-text-muted hidden sm:inline">· فواتير المشتريات</span>
-            )}
-          </div>
-        </div>
+    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${c.border} ${c.bg} transition-all`}>
+      <div className="relative flex-shrink-0">
+        <img src="/qoyod.png" alt="قيود" className="w-4 h-4 rounded-sm" />
+        <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-white ${status === 'connected' ? 'bg-primary animate-pulse' : status === 'disconnected' ? 'bg-red-400' : 'bg-gray-300 animate-pulse'}`} />
       </div>
-
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        <button
-          onClick={checkConnection}
-          disabled={checking}
-          className="p-1.5 rounded-lg hover:bg-white/80 text-text-muted hover:text-text transition-colors disabled:opacity-50"
-          title="إعادة التحقق"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${checking ? 'animate-spin' : ''}`} strokeWidth={1.8} />
-        </button>
-        <Link
-          to="/settings"
-          className="p-1.5 rounded-lg hover:bg-white/80 text-text-muted hover:text-text transition-colors hidden sm:flex"
-          title="إعدادات الربط"
-        >
-          <ExternalLink className="w-3.5 h-3.5" strokeWidth={1.8} />
-        </Link>
-      </div>
+      <span className={`text-[11px] font-medium ${c.text}`}>{c.label}</span>
+      <button
+        onClick={checkConnection}
+        disabled={checking}
+        className="p-0.5 text-text-muted hover:text-text transition-colors disabled:opacity-50"
+        title="إعادة التحقق"
+      >
+        <RefreshCw className={`w-3 h-3 ${checking ? 'animate-spin' : ''}`} strokeWidth={1.8} />
+      </button>
     </div>
   )
 }
@@ -126,12 +104,19 @@ function formatTimeAgo(dateStr) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
+  const [profileName, setProfileName] = useState('')
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [weekData, setWeekData] = useState([0, 0, 0, 0, 0, 0, 0])
 
   useEffect(() => {
     fetchData()
+    if (user?.username) {
+      supabase.from('user_settings').select('profile_name').eq('profile_username', user.username).single()
+        .then(({ data }) => { if (data?.profile_name) setProfileName(data.profile_name) })
+    }
   }, [])
 
   async function fetchData() {
@@ -222,29 +207,34 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-6xl">
-      {/* Welcome */}
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-lg sm:text-xl font-bold text-text">مرحباً بك</h1>
-        <p className="text-xs sm:text-sm text-text-muted mt-1">إليك ملخص نشاط الفواتير اليوم</p>
+    <div className="max-w-6xl animate-page">
+      {/* Welcome + Qoyod Status */}
+      <div className="mb-6 sm:mb-8 relative overflow-hidden bg-white rounded-2xl border border-border-light px-6 py-5" style={{
+        backgroundImage: 'linear-gradient(rgba(16,185,129,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(16,185,129,0.05) 1px, transparent 1px)',
+        backgroundSize: '24px 24px',
+      }}>
+        <div className="flex items-center justify-between relative z-10">
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-text">حيّاك الله يا {profileName || user?.username} 👋</h1>
+            <p className="text-xs sm:text-sm text-text-muted mt-1">إليك ملخص نشاط الفواتير اليوم</p>
+          </div>
+          <QoyodStatus />
+        </div>
       </div>
 
-      {/* Qoyod API Status */}
-      <QoyodStatus />
-
-      {/* Stats */}
+      {/* Stats — UPLOADER only sees count stats, not financial */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-        {stats.map((s) => (
+        {(isAdmin ? stats : stats.filter(s => s.label !== 'مطابقة ناجحة')).map((s) => (
           <div
             key={s.label}
-            className="bg-white rounded-xl sm:rounded-2xl border border-border-light p-4 sm:p-5 hover:shadow-sm transition-shadow"
+            className="bg-white rounded-xl sm:rounded-2xl border border-border-light p-4 sm:p-5 card-hover"
           >
             <div className="flex items-start justify-between mb-3 sm:mb-4">
               <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl ${s.accent} flex items-center justify-center`}>
                 <s.icon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" strokeWidth={1.8} />
               </div>
             </div>
-            <p className="text-xl sm:text-2xl font-bold text-text leading-none mb-1">{s.value}</p>
+            <p className="text-xl sm:text-2xl font-bold text-text leading-none mb-1 stat-value">{s.value}</p>
             <p className="text-[11px] sm:text-xs text-text-muted">{s.label}</p>
           </div>
         ))}
@@ -280,12 +270,14 @@ export default function Dashboard() {
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 pr-0 sm:pr-0">
+                    {isAdmin && (
                     <div className="sm:text-left sm:min-w-[80px]">
                       <span className="text-[13px] font-semibold text-text">
                         {inv.total_amount != null ? Number(inv.total_amount).toLocaleString('en-US') : '—'}
                       </span>
                       {inv.total_amount != null && <span className="text-[10px] text-text-muted mr-1">ر.س</span>}
                     </div>
+                    )}
 
                     {statusConfig[inv.status] && (
                       <span className={`text-[11px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${statusConfig[inv.status].bg}`}>
