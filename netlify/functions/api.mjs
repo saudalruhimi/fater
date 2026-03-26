@@ -2,7 +2,7 @@ import express from 'express'
 import serverless from 'serverless-http'
 import cors from 'cors'
 import multer from 'multer'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
 import { createClient } from '@supabase/supabase-js'
 
 const app = express()
@@ -283,6 +283,220 @@ app.put('/api/mappings/:id', async (req, res) => {
 app.delete('/api/mappings/:id', async (req, res) => {
   try { await supabase.from('item_mappings').delete().eq('id', req.params.id); res.json({ success: true }) } catch (e) { res.status(500).json({ error: e.message }) }
 })
+
+// ============ Telegram Bot ============
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+const TG_API = `https://api.telegram.org/bot${BOT_TOKEN}`
+const ALLOWED_USERS = (process.env.TELEGRAM_ALLOWED_USERS || '').split(',').map(s => s.trim()).filter(Boolean)
+
+function isAllowed(userId) {
+  if (!ALLOWED_USERS.length) return true
+  return ALLOWED_USERS.includes(String(userId))
+}
+
+async function tgSend(chatId, text, opts = {}) {
+  await fetch(`${TG_API}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', ...opts }) })
+}
+
+async function tgTyping(chatId) {
+  await fetch(`${TG_API}/sendChatAction`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, action: 'typing' }) })
+}
+
+async function tgGetFile(fileId) {
+  const r = await fetch(`${TG_API}/getFile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file_id: fileId }) })
+  const d = await r.json()
+  if (!d.ok) throw new Error('Failed to get file')
+  const fr = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${d.result.file_path}`)
+  return { buffer: Buffer.from(await fr.arrayBuffer()), path: d.result.file_path }
+}
+
+// Agent tools
+const agentTools = [{
+  functionDeclarations: [
+    { name: 'search_invoices', description: 'ابحث عن فواتير مشتريات بمعايير مختلفة', parameters: { type: SchemaType.OBJECT, properties: { vendor_name: { type: SchemaType.STRING }, invoice_number: { type: SchemaType.STRING }, month: { type: SchemaType.STRING }, min_amount: { type: SchemaType.NUMBER }, max_amount: { type: SchemaType.NUMBER } } } },
+    { name: 'get_vendor_info', description: 'جلب معلومات مورد معين', parameters: { type: SchemaType.OBJECT, properties: { vendor_name: { type: SchemaType.STRING } }, required: ['vendor_name'] } },
+    { name: 'get_monthly_summary', description: 'ملخص المشتريات لشهر معين', parameters: { type: SchemaType.OBJECT, properties: { month: { type: SchemaType.STRING } }, required: ['month'] } },
+    { name: 'create_bill', description: 'إنشاء فاتورة مشتريات - يحتاج تأكيد', parameters: { type: SchemaType.OBJECT, properties: { vendor_name: { type: SchemaType.STRING }, invoice_number: { type: SchemaType.STRING }, invoice_date: { type: SchemaType.STRING }, total_amount: { type: SchemaType.NUMBER }, items: { type: SchemaType.ARRAY, items: { type: SchemaType.OBJECT, properties: { description: { type: SchemaType.STRING }, quantity: { type: SchemaType.NUMBER }, unit_price: { type: SchemaType.NUMBER } } } } }, required: ['vendor_name', 'items'] } },
+    { name: 'create_payment', description: 'إنشاء سند صرف - يحتاج تأكيد', parameters: { type: SchemaType.OBJECT, properties: { vendor_name: { type: SchemaType.STRING }, amount: { type: SchemaType.NUMBER }, account_name: { type: SchemaType.STRING }, date: { type: SchemaType.STRING } }, required: ['vendor_name', 'amount'] } },
+    { name: 'scan_invoice_image', description: 'قراءة صورة فاتورة', parameters: { type: SchemaType.OBJECT, properties: { action: { type: SchemaType.STRING } } } },
+  ]
+}]
+
+// Agent tool execution
+async function executeAgentTool(name, args) {
+  switch (name) {
+    case 'search_invoices': {
+      let q = supabase.from('processed_invoices').select('*').order('created_at', { ascending: false }).limit(50)
+      const { data: invoices } = await q
+      let filtered = invoices || []
+      if (args.vendor_name) filtered = filtered.filter(i => (i.vendor_name || '').toLowerCase().includes(args.vendor_name.toLowerCase()))
+      if (args.invoice_number) filtered = filtered.filter(i => (i.invoice_number || '').includes(args.invoice_number))
+      if (args.month) filtered = filtered.filter(i => (i.invoice_date || '').startsWith(args.month))
+      if (args.min_amount) filtered = filtered.filter(i => Number(i.total_amount || 0) >= args.min_amount)
+      if (args.max_amount) filtered = filtered.filter(i => Number(i.total_amount || 0) <= args.max_amount)
+      return { count: filtered.length, total: filtered.reduce((s, i) => s + Number(i.total_amount || 0), 0), invoices: filtered.slice(0, 10).map(i => ({ invoice_number: i.invoice_number, vendor_name: i.vendor_name, date: i.invoice_date, amount: i.total_amount, status: i.status })) }
+    }
+    case 'get_vendor_info': {
+      const vd = await qoyodRequest('GET', '/vendors')
+      const vendors = vd.contacts || vd.vendors || []
+      const s = args.vendor_name.toLowerCase()
+      const v = vendors.find(x => (x.name || '').toLowerCase().includes(s) || (x.organization || '').toLowerCase().includes(s))
+      if (!v) return { found: false, message: `ما لقيت مورد باسم "${args.vendor_name}"` }
+      const { data: invs } = await supabase.from('processed_invoices').select('*').ilike('vendor_name', `%${args.vendor_name}%`).order('created_at', { ascending: false })
+      return { found: true, vendor: { id: v.id, name: v.name, organization: v.organization, phone: v.phone_number }, stats: { total_invoices: (invs || []).length, total_amount: (invs || []).reduce((s2, i) => s2 + Number(i.total_amount || 0), 0), last_invoice: invs?.[0] ? { number: invs[0].invoice_number, date: invs[0].invoice_date, amount: invs[0].total_amount } : null } }
+    }
+    case 'get_monthly_summary': {
+      const { data: invs } = await supabase.from('processed_invoices').select('*').gte('invoice_date', `${args.month}-01`).lte('invoice_date', `${args.month}-31`)
+      if (!invs?.length) return { month: args.month, count: 0, total: 0, message: 'ما فيه فواتير لهالشهر' }
+      const byV = {}
+      for (const i of invs) { const vn = i.vendor_name || '?'; if (!byV[vn]) byV[vn] = { count: 0, total: 0 }; byV[vn].count++; byV[vn].total += Number(i.total_amount || 0) }
+      const top = Object.entries(byV).sort((a, b) => b[1].total - a[1].total)[0]
+      return { month: args.month, count: invs.length, total: invs.reduce((s2, i) => s2 + Number(i.total_amount || 0), 0), top_vendor: top ? { name: top[0], ...top[1] } : null }
+    }
+    case 'create_bill': return { needs_confirmation: true, action: 'create_bill', data: args }
+    case 'create_payment': return { needs_confirmation: true, action: 'create_payment', data: args }
+    case 'scan_invoice_image': return { needs_image: true, action: args.action || 'scan_only' }
+    default: return { error: 'دالة غير معروفة' }
+  }
+}
+
+// Execute confirmed action
+async function execConfirmed(action, data) {
+  if (action === 'create_bill') {
+    const vd = await qoyodRequest('GET', '/vendors')
+    const vendors = vd.contacts || vd.vendors || []
+    const vendor = vendors.find(v => (v.name || '').toLowerCase().includes((data.vendor_name || '').toLowerCase()))
+    if (!vendor) throw new Error(`ما لقيت مورد باسم "${data.vendor_name}"`)
+    const id = await qoyodRequest('GET', '/inventories')
+    const inv = (id.inventories || [])[0]
+    if (!inv) throw new Error('ما فيه مخزن بقيود')
+    const pd = await qoyodRequest('GET', '/products')
+    const prods = (pd.products || []).map(p => ({ ...p, name: p.name_ar || p.name_en || '' }))
+    const line_items = []
+    for (const item of data.items || []) {
+      const ps = (item.description || '').toLowerCase()
+      const m = prods.find(p => p.name.toLowerCase().includes(ps) || ps.includes(p.name.toLowerCase()))
+      if (!m) throw new Error(`ما لقيت بند بقيود يطابق "${item.description}"`)
+      line_items.push({ product_id: m.id, description: item.description, quantity: item.quantity || 1, unit_price: item.unit_price || 0, tax_percent: 15, is_inclusive: true })
+    }
+    const bill = await qoyodRequest('POST', '/bills', { bill: { contact_id: vendor.id, status: 'Approved', issue_date: data.invoice_date || new Date().toISOString().split('T')[0], due_date: data.invoice_date || new Date().toISOString().split('T')[0], reference: data.invoice_number || '', inventory_id: inv.id, line_items } })
+    await supabase.from('processed_invoices').insert({ vendor_name: vendor.name, invoice_number: data.invoice_number, invoice_date: data.invoice_date, total_amount: data.total_amount, qoyod_bill_id: bill?.bill?.id, status: 'pushed' })
+    return { success: true, bill_id: bill?.bill?.id, vendor: vendor.name, total: bill?.bill?.total }
+  }
+  if (action === 'create_payment') {
+    const vd = await qoyodRequest('GET', '/vendors')
+    const vendors = vd.contacts || vd.vendors || []
+    const vendor = vendors.find(v => (v.name || '').toLowerCase().includes((data.vendor_name || '').toLowerCase()))
+    if (!vendor) throw new Error(`ما لقيت مورد باسم "${data.vendor_name}"`)
+    const ad = await qoyodRequest('GET', '/accounts')
+    const accs = (ad.accounts || []).map(a => ({ ...a, name: a.name_ar || a.name_en || '' }))
+    const as2 = (data.account_name || 'بنك').toLowerCase()
+    const acc = accs.find(a => a.name.toLowerCase().includes(as2) || as2.includes(a.name.toLowerCase()))
+    if (!acc) throw new Error('ما لقيت حساب دفع مناسب')
+    const payment = await qoyodRequest('POST', '/bill_payments', { bill_payment: { contact_id: vendor.id, account_id: acc.id, amount: data.amount, date: data.date || new Date().toISOString().split('T')[0], description: `سند صرف لـ ${vendor.name}` } })
+    return { success: true, payment, vendor: vendor.name, amount: data.amount, account: acc.name }
+  }
+  throw new Error('إجراء غير معروف')
+}
+
+// Chat sessions (in-memory — resets on cold start)
+const chatSessions = new Map()
+const pendingConfirmations = new Map()
+
+async function agentProcess(userId, text, imageBuffer = null, mimeType = null) {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    systemInstruction: `أنت "فاتِر" — مساعد محاسبة ذكي لمؤسسة سعودية. تتكلم بالعربي العامي السعودي البسيط.
+مهامك: بحث فواتير ومعلومات موردين، قراءة صور فواتير، تسجيل فواتير بقيود، سندات صرف، ملخصات وتقارير.
+قواعد: العمليات الحساسة تحتاج تأكيد. رد مختصر ومفيد. المبالغ بالريال السعودي. لو أرسل صورة فاتورة استخدم scan_invoice_image.`,
+    tools: agentTools,
+  })
+  if (!chatSessions.has(userId)) chatSessions.set(userId, model.startChat({ history: [] }))
+  const chat = chatSessions.get(userId)
+  const parts = []
+  if (imageBuffer) { parts.push({ inlineData: { data: imageBuffer.toString('base64'), mimeType } }); parts.push({ text: text || 'اقرأ هالفاتورة واستخرج بياناتها' }) }
+  else parts.push({ text })
+
+  let response = await chat.sendMessage(parts)
+  let result = response.response
+  let loops = 5
+  while (result.candidates?.[0]?.content?.parts?.some(p => p.functionCall) && loops-- > 0) {
+    const fcs = result.candidates[0].content.parts.filter(p => p.functionCall)
+    const frs = []
+    for (const fc of fcs) {
+      try { const r = await executeAgentTool(fc.functionCall.name, fc.functionCall.args); frs.push({ functionResponse: { name: fc.functionCall.name, response: r } }) }
+      catch (e) { frs.push({ functionResponse: { name: fc.functionCall.name, response: { error: e.message } } }) }
+    }
+    response = await chat.sendMessage(frs)
+    result = response.response
+  }
+  const txt = result.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('\n') || 'ما قدرت أفهم طلبك'
+  await supabase.from('telegram_chats').insert([{ user_id: String(userId), role: 'user', content: text || '[صورة]' }, { user_id: String(userId), role: 'assistant', content: txt }])
+  return txt
+}
+
+// Telegram webhook
+app.post('/api/telegram/webhook', async (req, res) => {
+  res.sendStatus(200)
+  try {
+    const msg = req.body?.message
+    if (!msg) return
+    const chatId = msg.chat.id
+    const userId = msg.from?.id || chatId
+    const text = msg.text || msg.caption || ''
+    const firstName = msg.from?.first_name || ''
+
+    if (!isAllowed(userId)) { await tgSend(chatId, `⛔ عذراً ${firstName}، ما عندك صلاحية.\n\n🆔 رقمك: <code>${userId}</code>\nأرسله للمسؤول.`); return }
+
+    if (text === '/start') { await tgSend(chatId, `أهلاً ${firstName} 👋\n\nأنا <b>فاتِر</b> — مساعدك المحاسبي.\n\n🆔 رقمك: <code>${userId}</code>\n\nأقدر:\n• 📸 أقرأ فواتير وأسجلها\n• 🔍 أبحث عن فواتير وموردين\n• 📊 أعطيك ملخصات\n• 💳 أسوي سندات صرف\n\nكلمني بالعربي 😊`); return }
+    if (text === '/clear') { chatSessions.delete(userId); await tgSend(chatId, 'تم مسح المحادثة ✨'); return }
+    if (text === '/id') { await tgSend(chatId, `🆔 رقمك: <code>${userId}</code>`); return }
+
+    // Pending confirmation
+    if (pendingConfirmations.has(userId)) {
+      const pending = pendingConfirmations.get(userId)
+      if (/^(نعم|اي|ايه|اكيد|أكيد|yes|ok|تمام|سجل|سوي|نفذ)$/i.test(text.trim())) {
+        pendingConfirmations.delete(userId)
+        await tgTyping(chatId)
+        try {
+          const r = await execConfirmed(pending.action, pending.data)
+          if (r.success) {
+            if (pending.action === 'create_bill') await tgSend(chatId, `✅ تم تسجيل الفاتورة\n\n📋 رقم: ${r.bill_id}\n🏢 ${r.vendor}\n💰 ${r.total} ر.س`)
+            else await tgSend(chatId, `✅ تم سند الصرف\n\n🏢 ${r.vendor}\n💰 ${r.amount} ر.س\n🏦 ${r.account}`)
+          }
+        } catch (e) { await tgSend(chatId, `❌ ${e.message}`) }
+        return
+      }
+      if (/^(لا|لأ|الغ|الغي|cancel|no)$/i.test(text.trim())) { pendingConfirmations.delete(userId); await tgSend(chatId, '⏹ تم الإلغاء.'); return }
+      pendingConfirmations.delete(userId)
+    }
+
+    await tgTyping(chatId)
+
+    let imageBuffer = null, mimeType = null
+    if (msg.photo?.length) { const f = await tgGetFile(msg.photo[msg.photo.length - 1].file_id); imageBuffer = f.buffer; mimeType = 'image/jpeg' }
+    else if (msg.document?.mime_type?.startsWith('image/')) { const f = await tgGetFile(msg.document.file_id); imageBuffer = f.buffer; mimeType = msg.document.mime_type }
+
+    const reply = await agentProcess(userId, text, imageBuffer, mimeType)
+    if (reply.length > 4000) { const chunks = reply.match(/.{1,4000}/gs) || [reply]; for (const c of chunks) await tgSend(chatId, c) }
+    else await tgSend(chatId, reply)
+  } catch (e) {
+    console.error('[TG]', e.message)
+    const cid = req.body?.message?.chat?.id
+    if (cid) await tgSend(cid, `❌ ${e.message}`).catch(() => {})
+  }
+})
+
+app.post('/api/telegram/set-webhook', async (req, res) => {
+  try {
+    const { url } = req.body
+    const r = await fetch(`${TG_API}/setWebhook`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: `${url}/api/telegram/webhook`, allowed_updates: ['message'] }) })
+    res.json({ success: true, result: await r.json() })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.get('/api/telegram/status', (req, res) => res.json({ configured: !!BOT_TOKEN }))
 
 // Health
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }))

@@ -5,6 +5,7 @@ import scanRoutes from './routes/scan.js'
 import matchRoutes from './routes/match.js'
 import qoyodRoutes from './routes/qoyod.js'
 import mappingsRoutes from './routes/mappings.js'
+import telegramRoutes from './routes/telegram.js'
 
 dotenv.config()
 
@@ -19,6 +20,7 @@ app.use('/api/scan', scanRoutes)
 app.use('/api/match', matchRoutes)
 app.use('/api/qoyod', qoyodRoutes)
 app.use('/api/mappings', mappingsRoutes)
+app.use('/api/telegram', telegramRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {
