@@ -438,20 +438,19 @@ async function agentProcess(userId, text, imageBuffer = null, mimeType = null) {
 
 // Telegram webhook
 app.post('/api/telegram/webhook', async (req, res) => {
-  res.sendStatus(200)
   try {
     const msg = req.body?.message
-    if (!msg) return
+    if (!msg) return res.sendStatus(200)
     const chatId = msg.chat.id
     const userId = msg.from?.id || chatId
     const text = msg.text || msg.caption || ''
     const firstName = msg.from?.first_name || ''
 
-    if (!isAllowed(userId)) { await tgSend(chatId, `⛔ عذراً ${firstName}، ما عندك صلاحية.\n\n🆔 رقمك: <code>${userId}</code>\nأرسله للمسؤول.`); return }
+    if (!isAllowed(userId)) { await tgSend(chatId, `⛔ عذراً ${firstName}، ما عندك صلاحية.\n\n🆔 رقمك: <code>${userId}</code>\nأرسله للمسؤول.`); return res.sendStatus(200) }
 
-    if (text === '/start') { await tgSend(chatId, `أهلاً ${firstName} 👋\n\nأنا <b>فاتِر</b> — مساعدك المحاسبي.\n\n🆔 رقمك: <code>${userId}</code>\n\nأقدر:\n• 📸 أقرأ فواتير وأسجلها\n• 🔍 أبحث عن فواتير وموردين\n• 📊 أعطيك ملخصات\n• 💳 أسوي سندات صرف\n\nكلمني بالعربي 😊`); return }
-    if (text === '/clear') { chatSessions.delete(userId); await tgSend(chatId, 'تم مسح المحادثة ✨'); return }
-    if (text === '/id') { await tgSend(chatId, `🆔 رقمك: <code>${userId}</code>`); return }
+    if (text === '/start') { await tgSend(chatId, `أهلاً ${firstName} 👋\n\nأنا <b>فاتِر</b> — مساعدك المحاسبي.\n\n🆔 رقمك: <code>${userId}</code>\n\nأقدر:\n• 📸 أقرأ فواتير وأسجلها\n• 🔍 أبحث عن فواتير وموردين\n• 📊 أعطيك ملخصات\n• 💳 أسوي سندات صرف\n\nكلمني بالعربي 😊`); return res.sendStatus(200) }
+    if (text === '/clear') { chatSessions.delete(userId); await tgSend(chatId, 'تم مسح المحادثة ✨'); return res.sendStatus(200) }
+    if (text === '/id') { await tgSend(chatId, `🆔 رقمك: <code>${userId}</code>`); return res.sendStatus(200) }
 
     // Pending confirmation
     if (pendingConfirmations.has(userId)) {
@@ -466,9 +465,9 @@ app.post('/api/telegram/webhook', async (req, res) => {
             else await tgSend(chatId, `✅ تم سند الصرف\n\n🏢 ${r.vendor}\n💰 ${r.amount} ر.س\n🏦 ${r.account}`)
           }
         } catch (e) { await tgSend(chatId, `❌ ${e.message}`) }
-        return
+        return res.sendStatus(200)
       }
-      if (/^(لا|لأ|الغ|الغي|cancel|no)$/i.test(text.trim())) { pendingConfirmations.delete(userId); await tgSend(chatId, '⏹ تم الإلغاء.'); return }
+      if (/^(لا|لأ|الغ|الغي|cancel|no)$/i.test(text.trim())) { pendingConfirmations.delete(userId); await tgSend(chatId, '⏹ تم الإلغاء.'); return res.sendStatus(200) }
       pendingConfirmations.delete(userId)
     }
 
@@ -481,10 +480,13 @@ app.post('/api/telegram/webhook', async (req, res) => {
     const reply = await agentProcess(userId, text, imageBuffer, mimeType)
     if (reply.length > 4000) { const chunks = reply.match(/.{1,4000}/gs) || [reply]; for (const c of chunks) await tgSend(chatId, c) }
     else await tgSend(chatId, reply)
+
+    return res.sendStatus(200)
   } catch (e) {
     console.error('[TG]', e.message)
     const cid = req.body?.message?.chat?.id
     if (cid) await tgSend(cid, `❌ ${e.message}`).catch(() => {})
+    return res.sendStatus(200)
   }
 })
 
