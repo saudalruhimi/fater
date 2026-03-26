@@ -317,7 +317,7 @@ const agentTools = [{
     { name: 'get_vendor_info', description: 'جلب معلومات مورد معين', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' } }, required: ['vendor_name'] } },
     { name: 'get_monthly_summary', description: 'ملخص المشتريات لشهر معين', parameters: { type: 'OBJECT', properties: { month: { type: 'STRING' } }, required: ['month'] } },
     { name: 'create_bill', description: 'إنشاء فاتورة مشتريات - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' }, invoice_number: { type: 'STRING' }, invoice_date: { type: 'STRING' }, total_amount: { type: 'NUMBER' }, items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { description: { type: 'STRING' }, quantity: { type: 'NUMBER' }, unit_price: { type: 'NUMBER' } } } } }, required: ['vendor_name', 'items'] } },
-    { name: 'create_payment', description: 'إنشاء سند صرف على فاتورة بقيود - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING', description: 'اسم المورد' }, reference: { type: 'STRING', description: 'رقم مرجع الفاتورة مثل BILL241 — أسرع طريقة للبحث' }, bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود (id)' }, amount: { type: 'NUMBER', description: 'مبلغ السند' }, account_name: { type: 'STRING', description: 'حساب الدفع: بنك الراجحي أو النقدية بالخزينة' }, date: { type: 'STRING' } }, required: ['amount'] } },
+    { name: 'create_payment', description: 'إنشاء سند صرف على فاتورة بقيود - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING', description: 'اسم المورد' }, reference: { type: 'STRING', description: 'رقم مرجع الفاتورة مثل BILL241' }, bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود (id)' }, amount: { type: 'NUMBER', description: 'مبلغ السند' }, account_name: { type: 'STRING', description: 'حساب الدفع. تحويل/بنك/الراجحي = حساب البنك الجاري - الراجحي. كاش/نقد/خزينة = النقدية في الخزينة' }, date: { type: 'STRING' } }, required: ['amount'] } },
     { name: 'scan_invoice_image', description: 'قراءة صورة فاتورة', parameters: { type: 'OBJECT', properties: { action: { type: 'STRING' } } } },
     { name: 'update_bill', description: 'تعديل فاتورة مشتريات موجودة بقيود (لازم تكون موافق عليها مو مدفوعة) - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود (id)' }, reference: { type: 'STRING', description: 'رقم المرجع للبحث' }, notes: { type: 'STRING' }, issue_date: { type: 'STRING' }, due_date: { type: 'STRING' }, items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { description: { type: 'STRING' }, quantity: { type: 'NUMBER' }, unit_price: { type: 'NUMBER' } } } } } } },
     { name: 'delete_bill', description: 'حذف فاتورة مشتريات من قيود (لازم تكون موافق عليها مو مدفوعة) - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود' }, reference: { type: 'STRING', description: 'رقم المرجع للبحث' } } } },
@@ -529,11 +529,15 @@ async function execConfirmed(action, data) {
     }
     if (!billId) throw new Error('لازم تعطيني اسم المورد أو رقم الفاتورة')
 
-    // Find payment account
+    // Find payment account — map common words to actual account names
     const ad = await qoyodRequest('GET', '/accounts')
     const accs = (ad.accounts || []).map(a => ({ ...a, name: a.name_ar || a.name_en || '' }))
-    const as2 = (data.account_name || 'بنك').toLowerCase()
-    const acc = accs.find(a => a.name.toLowerCase().includes(as2) || as2.includes(a.name.toLowerCase()))
+    let accSearch = (data.account_name || 'بنك').toLowerCase()
+    // Map shortcuts to real account names
+    if (/تحويل|بنك|راجحي|حوالة|bank/.test(accSearch)) accSearch = 'البنك الجاري'
+    else if (/كاش|نقد|خزينة|cash/.test(accSearch)) accSearch = 'النقدية في الخزينة'
+    else if (/مختلط|شبكة/.test(accSearch)) accSearch = 'مختلط'
+    const acc = accs.find(a => a.name.toLowerCase().includes(accSearch))
     if (!acc) throw new Error('ما لقيت حساب دفع مناسب')
 
     const ref = 'PYT-' + Date.now().toString().slice(-6)
