@@ -322,19 +322,48 @@ const agentTools = [{
   ]
 }]
 
-// Agent tool execution
+// Fetch all Qoyod bills (handles pagination)
+async function getAllQoyodBills() {
+  const allBills = []
+  let page = 1
+  while (page <= 10) {
+    const d = await qoyodRequest('GET', `/bills?page=${page}`)
+    const bills = d.bills || []
+    if (!bills.length) break
+    allBills.push(...bills)
+    if (bills.length < 100) break
+    page++
+  }
+  return allBills
+}
+
+// Agent tool execution — all tools query Qoyod directly
 async function executeAgentTool(name, args) {
   switch (name) {
     case 'search_invoices': {
-      let q = supabase.from('processed_invoices').select('*').order('created_at', { ascending: false }).limit(50)
-      const { data: invoices } = await q
-      let filtered = invoices || []
-      if (args.vendor_name) filtered = filtered.filter(i => (i.vendor_name || '').toLowerCase().includes(args.vendor_name.toLowerCase()))
-      if (args.invoice_number) filtered = filtered.filter(i => (i.invoice_number || '').includes(args.invoice_number))
-      if (args.month) filtered = filtered.filter(i => (i.invoice_date || '').startsWith(args.month))
-      if (args.min_amount) filtered = filtered.filter(i => Number(i.total_amount || 0) >= args.min_amount)
-      if (args.max_amount) filtered = filtered.filter(i => Number(i.total_amount || 0) <= args.max_amount)
-      return { count: filtered.length, total: filtered.reduce((s, i) => s + Number(i.total_amount || 0), 0), invoices: filtered.slice(0, 10).map(i => ({ invoice_number: i.invoice_number, vendor_name: i.vendor_name, date: i.invoice_date, amount: i.total_amount, status: i.status })) }
+      const allBills = await getAllQoyodBills()
+      let filtered = allBills
+      if (args.vendor_name) {
+        const s = args.vendor_name.toLowerCase()
+        filtered = filtered.filter(b => (b.contact?.name || '').toLowerCase().includes(s) || (b.contact?.organization || '').toLowerCase().includes(s))
+      }
+      if (args.invoice_number) filtered = filtered.filter(b => (b.reference || '').includes(args.invoice_number))
+      if (args.month) filtered = filtered.filter(b => (b.issue_date || '').startsWith(args.month))
+      if (args.min_amount) filtered = filtered.filter(b => Number(b.total || 0) >= args.min_amount)
+      if (args.max_amount) filtered = filtered.filter(b => Number(b.total || 0) <= args.max_amount)
+      return {
+        count: filtered.length,
+        total: filtered.reduce((s, b) => s + Number(b.total || 0), 0),
+        total_paid: filtered.reduce((s, b) => s + Number(b.paid_amount || 0), 0),
+        total_due: filtered.reduce((s, b) => s + Number(b.due_amount || 0), 0),
+        invoices: filtered.slice(0, 15).map(b => ({
+          id: b.id, reference: b.reference, vendor: b.contact?.name,
+          date: b.issue_date, due_date: b.due_date,
+          total: b.total, paid: b.paid_amount, due: b.due_amount,
+          status: b.status,
+          items: (b.line_items || []).map(li => li.product_name).join('، ')
+        }))
+      }
     }
     case 'get_vendor_info': {
       const vd = await qoyodRequest('GET', '/vendors')
@@ -342,16 +371,65 @@ async function executeAgentTool(name, args) {
       const s = args.vendor_name.toLowerCase()
       const v = vendors.find(x => (x.name || '').toLowerCase().includes(s) || (x.organization || '').toLowerCase().includes(s))
       if (!v) return { found: false, message: `ما لقيت مورد باسم "${args.vendor_name}"` }
-      const { data: invs } = await supabase.from('processed_invoices').select('*').ilike('vendor_name', `%${args.vendor_name}%`).order('created_at', { ascending: false })
-      return { found: true, vendor: { id: v.id, name: v.name, organization: v.organization, phone: v.phone_number }, stats: { total_invoices: (invs || []).length, total_amount: (invs || []).reduce((s2, i) => s2 + Number(i.total_amount || 0), 0), last_invoice: invs?.[0] ? { number: invs[0].invoice_number, date: invs[0].invoice_date, amount: invs[0].total_amount } : null } }
+
+      // Get all bills for this vendor from Qoyod
+      const allBills = await getAllQoyodBills()
+      const vendorBills = allBills.filter(b => b.contact?.id === v.id)
+      const totalAmount = vendorBills.reduce((s2, b) => s2 + Number(b.total || 0), 0)
+      const totalPaid = vendorBills.reduce((s2, b) => s2 + Number(b.paid_amount || 0), 0)
+      const totalDue = vendorBills.reduce((s2, b) => s2 + Number(b.due_amount || 0), 0)
+      const unpaid = vendorBills.filter(b => Number(b.due_amount || 0) > 0)
+      const lastBill = vendorBills.sort((a, b) => b.issue_date?.localeCompare(a.issue_date))[0]
+
+      // Get payments
+      const pd = await qoyodRequest('GET', '/bill_payments')
+      const payments = (pd.receipts || []).filter(p => p.contact_id === v.id)
+      const lastPayment = payments.sort((a, b) => b.date?.localeCompare(a.date))[0]
+
+      return {
+        found: true,
+        vendor: { id: v.id, name: v.name, organization: v.organization, phone: v.phone_number, tax_number: v.tax_number, status: v.status },
+        stats: {
+          total_bills: vendorBills.length,
+          total_amount: totalAmount,
+          total_paid: totalPaid,
+          total_due: totalDue,
+          unpaid_bills: unpaid.length,
+          last_bill: lastBill ? { id: lastBill.id, reference: lastBill.reference, date: lastBill.issue_date, total: lastBill.total, due: lastBill.due_amount, status: lastBill.status } : null,
+          last_payment: lastPayment ? { date: lastPayment.date, amount: lastPayment.amount } : null,
+          unpaid_list: unpaid.slice(0, 5).map(b => ({ id: b.id, reference: b.reference, date: b.issue_date, total: b.total, due: b.due_amount }))
+        }
+      }
     }
     case 'get_monthly_summary': {
-      const { data: invs } = await supabase.from('processed_invoices').select('*').gte('invoice_date', `${args.month}-01`).lte('invoice_date', `${args.month}-31`)
-      if (!invs?.length) return { month: args.month, count: 0, total: 0, message: 'ما فيه فواتير لهالشهر' }
-      const byV = {}
-      for (const i of invs) { const vn = i.vendor_name || '?'; if (!byV[vn]) byV[vn] = { count: 0, total: 0 }; byV[vn].count++; byV[vn].total += Number(i.total_amount || 0) }
-      const top = Object.entries(byV).sort((a, b) => b[1].total - a[1].total)[0]
-      return { month: args.month, count: invs.length, total: invs.reduce((s2, i) => s2 + Number(i.total_amount || 0), 0), top_vendor: top ? { name: top[0], ...top[1] } : null }
+      const allBills = await getAllQoyodBills()
+      const monthBills = allBills.filter(b => (b.issue_date || '').startsWith(args.month))
+      if (!monthBills.length) return { month: args.month, count: 0, total: 0, message: 'ما فيه فواتير لهالشهر بقيود' }
+
+      const byVendor = {}
+      for (const b of monthBills) {
+        const vn = b.contact?.name || '?'
+        if (!byVendor[vn]) byVendor[vn] = { count: 0, total: 0, paid: 0, due: 0 }
+        byVendor[vn].count++
+        byVendor[vn].total += Number(b.total || 0)
+        byVendor[vn].paid += Number(b.paid_amount || 0)
+        byVendor[vn].due += Number(b.due_amount || 0)
+      }
+      const sorted = Object.entries(byVendor).sort((a, b) => b[1].total - a[1].total)
+
+      return {
+        month: args.month,
+        count: monthBills.length,
+        total: monthBills.reduce((s2, b) => s2 + Number(b.total || 0), 0),
+        total_paid: monthBills.reduce((s2, b) => s2 + Number(b.paid_amount || 0), 0),
+        total_due: monthBills.reduce((s2, b) => s2 + Number(b.due_amount || 0), 0),
+        by_status: {
+          approved: monthBills.filter(b => b.status === 'Approved').length,
+          paid: monthBills.filter(b => b.status === 'Paid').length,
+          draft: monthBills.filter(b => b.status === 'Draft').length,
+        },
+        top_vendors: sorted.slice(0, 5).map(([name, s2]) => ({ name, ...s2 }))
+      }
     }
     case 'create_bill': return { needs_confirmation: true, action: 'create_bill', data: args }
     case 'create_payment': return { needs_confirmation: true, action: 'create_payment', data: args }
