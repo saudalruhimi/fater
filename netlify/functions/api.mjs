@@ -2,7 +2,7 @@ import express from 'express'
 import serverless from 'serverless-http'
 import cors from 'cors'
 import multer from 'multer'
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@supabase/supabase-js'
 
 const app = express()
@@ -313,12 +313,12 @@ async function tgGetFile(fileId) {
 // Agent tools
 const agentTools = [{
   functionDeclarations: [
-    { name: 'search_invoices', description: 'ابحث عن فواتير مشتريات بمعايير مختلفة', parameters: { type: SchemaType.OBJECT, properties: { vendor_name: { type: SchemaType.STRING }, invoice_number: { type: SchemaType.STRING }, month: { type: SchemaType.STRING }, min_amount: { type: SchemaType.NUMBER }, max_amount: { type: SchemaType.NUMBER } } } },
-    { name: 'get_vendor_info', description: 'جلب معلومات مورد معين', parameters: { type: SchemaType.OBJECT, properties: { vendor_name: { type: SchemaType.STRING } }, required: ['vendor_name'] } },
-    { name: 'get_monthly_summary', description: 'ملخص المشتريات لشهر معين', parameters: { type: SchemaType.OBJECT, properties: { month: { type: SchemaType.STRING } }, required: ['month'] } },
-    { name: 'create_bill', description: 'إنشاء فاتورة مشتريات - يحتاج تأكيد', parameters: { type: SchemaType.OBJECT, properties: { vendor_name: { type: SchemaType.STRING }, invoice_number: { type: SchemaType.STRING }, invoice_date: { type: SchemaType.STRING }, total_amount: { type: SchemaType.NUMBER }, items: { type: SchemaType.ARRAY, items: { type: SchemaType.OBJECT, properties: { description: { type: SchemaType.STRING }, quantity: { type: SchemaType.NUMBER }, unit_price: { type: SchemaType.NUMBER } } } } }, required: ['vendor_name', 'items'] } },
-    { name: 'create_payment', description: 'إنشاء سند صرف - يحتاج تأكيد', parameters: { type: SchemaType.OBJECT, properties: { vendor_name: { type: SchemaType.STRING }, amount: { type: SchemaType.NUMBER }, account_name: { type: SchemaType.STRING }, date: { type: SchemaType.STRING } }, required: ['vendor_name', 'amount'] } },
-    { name: 'scan_invoice_image', description: 'قراءة صورة فاتورة', parameters: { type: SchemaType.OBJECT, properties: { action: { type: SchemaType.STRING } } } },
+    { name: 'search_invoices', description: 'ابحث عن فواتير مشتريات بمعايير مختلفة', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' }, invoice_number: { type: 'STRING' }, month: { type: 'STRING' }, min_amount: { type: 'NUMBER' }, max_amount: { type: 'NUMBER' } } } },
+    { name: 'get_vendor_info', description: 'جلب معلومات مورد معين', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' } }, required: ['vendor_name'] } },
+    { name: 'get_monthly_summary', description: 'ملخص المشتريات لشهر معين', parameters: { type: 'OBJECT', properties: { month: { type: 'STRING' } }, required: ['month'] } },
+    { name: 'create_bill', description: 'إنشاء فاتورة مشتريات - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' }, invoice_number: { type: 'STRING' }, invoice_date: { type: 'STRING' }, total_amount: { type: 'NUMBER' }, items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { description: { type: 'STRING' }, quantity: { type: 'NUMBER' }, unit_price: { type: 'NUMBER' } } } } }, required: ['vendor_name', 'items'] } },
+    { name: 'create_payment', description: 'إنشاء سند صرف - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' }, amount: { type: 'NUMBER' }, account_name: { type: 'STRING' }, date: { type: 'STRING' } }, required: ['vendor_name', 'amount'] } },
+    { name: 'scan_invoice_image', description: 'قراءة صورة فاتورة', parameters: { type: 'OBJECT', properties: { action: { type: 'STRING' } } } },
   ]
 }]
 
