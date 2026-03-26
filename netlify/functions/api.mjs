@@ -317,7 +317,7 @@ const agentTools = [{
     { name: 'get_vendor_info', description: 'جلب معلومات مورد معين', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' } }, required: ['vendor_name'] } },
     { name: 'get_monthly_summary', description: 'ملخص المشتريات لشهر معين', parameters: { type: 'OBJECT', properties: { month: { type: 'STRING' } }, required: ['month'] } },
     { name: 'create_bill', description: 'إنشاء فاتورة مشتريات - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' }, invoice_number: { type: 'STRING' }, invoice_date: { type: 'STRING' }, total_amount: { type: 'NUMBER' }, items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { description: { type: 'STRING' }, quantity: { type: 'NUMBER' }, unit_price: { type: 'NUMBER' } } } } }, required: ['vendor_name', 'items'] } },
-    { name: 'create_payment', description: 'إنشاء سند صرف - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING' }, amount: { type: 'NUMBER' }, account_name: { type: 'STRING' }, date: { type: 'STRING' } }, required: ['vendor_name', 'amount'] } },
+    { name: 'create_payment', description: 'إنشاء سند صرف على فاتورة بقيود - يحتاج تأكيد. لازم يكون فيه فاتورة غير مدفوعة للمورد', parameters: { type: 'OBJECT', properties: { vendor_name: { type: 'STRING', description: 'اسم المورد — يبحث عن أقدم فاتورة غير مدفوعة له' }, bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود مباشرة (اختياري)' }, amount: { type: 'NUMBER', description: 'مبلغ السند' }, account_name: { type: 'STRING', description: 'حساب الدفع: بنك الراجحي أو النقدية بالخزينة' }, date: { type: 'STRING' } }, required: ['amount'] } },
     { name: 'scan_invoice_image', description: 'قراءة صورة فاتورة', parameters: { type: 'OBJECT', properties: { action: { type: 'STRING' } } } },
     { name: 'update_bill', description: 'تعديل فاتورة مشتريات موجودة بقيود (لازم تكون موافق عليها مو مدفوعة) - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود (id)' }, reference: { type: 'STRING', description: 'رقم المرجع للبحث' }, notes: { type: 'STRING' }, issue_date: { type: 'STRING' }, due_date: { type: 'STRING' }, items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { description: { type: 'STRING' }, quantity: { type: 'NUMBER' }, unit_price: { type: 'NUMBER' } } } } } } },
     { name: 'delete_bill', description: 'حذف فاتورة مشتريات من قيود (لازم تكون موافق عليها مو مدفوعة) - يحتاج تأكيد', parameters: { type: 'OBJECT', properties: { bill_id: { type: 'NUMBER', description: 'رقم الفاتورة بقيود' }, reference: { type: 'STRING', description: 'رقم المرجع للبحث' } } } },
@@ -490,17 +490,42 @@ async function execConfirmed(action, data) {
     return { success: true, bill_id: bill?.bill?.id, vendor: vendor.name, total: bill?.bill?.total }
   }
   if (action === 'create_payment') {
-    const vd = await qoyodRequest('GET', '/vendors')
-    const vendors = vd.contacts || vd.vendors || []
-    const vendor = vendors.find(v => (v.name || '').toLowerCase().includes((data.vendor_name || '').toLowerCase()))
-    if (!vendor) throw new Error(`ما لقيت مورد باسم "${data.vendor_name}"`)
+    // Find the bill to pay
+    let billId = data.bill_id
+    let vendorName = data.vendor_name || ''
+    if (!billId && vendorName) {
+      // Search for unpaid bills for this vendor
+      const allBills = await getAllQoyodBills()
+      const s = vendorName.toLowerCase()
+      const vendorBills = allBills.filter(b =>
+        (b.contact?.name || '').toLowerCase().includes(s) && Number(b.due_amount || 0) > 0
+      ).sort((a, b) => a.issue_date?.localeCompare(b.issue_date))
+      if (!vendorBills.length) throw new Error(`ما لقيت فواتير غير مدفوعة لـ "${vendorName}"`)
+      billId = vendorBills[0].id
+      vendorName = vendorBills[0].contact?.name || vendorName
+    }
+    if (!billId) throw new Error('لازم تعطيني اسم المورد أو رقم الفاتورة')
+
+    // Find payment account
     const ad = await qoyodRequest('GET', '/accounts')
     const accs = (ad.accounts || []).map(a => ({ ...a, name: a.name_ar || a.name_en || '' }))
     const as2 = (data.account_name || 'بنك').toLowerCase()
     const acc = accs.find(a => a.name.toLowerCase().includes(as2) || as2.includes(a.name.toLowerCase()))
     if (!acc) throw new Error('ما لقيت حساب دفع مناسب')
-    const payment = await qoyodRequest('POST', '/bill_payments', { bill_payment: { contact_id: vendor.id, account_id: acc.id, amount: data.amount, date: data.date || new Date().toISOString().split('T')[0], description: `سند صرف لـ ${vendor.name}` } })
-    return { success: true, payment, vendor: vendor.name, amount: data.amount, account: acc.name }
+
+    const ref = 'PYT-' + Date.now().toString().slice(-6)
+    const payment = await qoyodRequest('POST', '/bill_payments', {
+      bill_payment: {
+        reference: ref,
+        bill_id: String(billId),
+        account_id: String(acc.id),
+        amount: String(data.amount),
+        date: data.date || new Date().toISOString().split('T')[0],
+        description: data.description || `سند صرف لـ ${vendorName}`
+      }
+    })
+    console.log('[PAYMENT] Created:', JSON.stringify(payment).slice(0, 300))
+    return { success: true, payment, vendor: vendorName, amount: data.amount, account: acc.name, reference: ref }
   }
   if (action === 'update_bill') {
     const billId = data.bill_id
