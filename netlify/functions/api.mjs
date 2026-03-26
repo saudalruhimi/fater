@@ -328,7 +328,7 @@ const agentTools = [{
 async function getAllQoyodBills() {
   const allBills = []
   let page = 1
-  while (page <= 10) {
+  while (page <= 30) {
     const d = await qoyodRequest('GET', `/bills?page=${page}`)
     const bills = d.bills || []
     if (!bills.length) break
