@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
-import { Search, Bell, X, FileText, CheckCircle2, AlertCircle, Clock, Trash2, Megaphone, Sparkles, ArrowLeft } from 'lucide-react'
+import { Search, Bell, X, FileText, CheckCircle2, AlertCircle, Clock, Trash2, Megaphone, Sparkles, ArrowLeft, Sun, Moon } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -32,10 +32,10 @@ function timeAgo(date) {
   return `منذ ${Math.floor(diff / 86400)} ي`
 }
 
-// Bump this when you publish a new update entry in pages/Updates.jsx
-const LATEST_UPDATE_DATE = '2026-04-26'
+// Bump this when you publish a new update entry in pages/Updates.jsx (use date or date+suffix)
+const LATEST_UPDATE_DATE = '2026-04-26-2'
 const LATEST_UPDATE_VERSION = 'v1.3.0'
-const LATEST_UPDATE_TITLE = 'تحسينات الإدخال والفلترة والإشعارات'
+const LATEST_UPDATE_TITLE = 'الوضع الليلي + نظام Toast الذكي'
 
 export default function Layout() {
   const location = useLocation()
@@ -46,8 +46,16 @@ export default function Layout() {
   const [filter, setFilter] = useState(() => localStorage.getItem('notif_filter') || 'all')
   const [clearedAt, setClearedAt] = useState(() => Number(localStorage.getItem('notif_cleared_at') || 0))
   const [updatesRead, setUpdatesRead] = useState(() => localStorage.getItem('updates_read_at') || '')
+  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark')
   const ref = useRef(null)
   const hasNewUpdate = LATEST_UPDATE_DATE > updatesRead
+
+  useEffect(() => {
+    const html = document.documentElement
+    if (dark) html.classList.add('dark')
+    else html.classList.remove('dark')
+    localStorage.setItem('theme', dark ? 'dark' : 'light')
+  }, [dark])
 
   // Show modal once when there's a new update and user hasn't seen it
   const [updateModalOpen, setUpdateModalOpen] = useState(false)
@@ -149,6 +157,19 @@ export default function Layout() {
               <span className="absolute top-1.5 left-1.5 w-2 h-2 bg-primary rounded-full ring-2 ring-bg" />
             )}
           </Link>
+
+          {/* Dark mode toggle */}
+          <button
+            onClick={() => setDark(!dark)}
+            title={dark ? 'الوضع النهاري' : 'الوضع الليلي'}
+            className="relative p-2 rounded-lg hover:bg-surface-lighter transition-colors overflow-hidden group"
+          >
+            <span className="block transition-transform duration-500" style={{ transform: dark ? 'rotate(0deg)' : 'rotate(180deg)' }}>
+              {dark
+                ? <Sun className="w-[18px] h-[18px] text-amber-400" strokeWidth={1.8} />
+                : <Moon className="w-[18px] h-[18px] text-text-secondary group-hover:text-primary" strokeWidth={1.8} />}
+            </span>
+          </button>
 
           {/* Notifications */}
           <div ref={ref} className="relative">

@@ -5,6 +5,7 @@ import {
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { scanInvoice, matchItems, pushToQoyod, getInventories, getVendors, getProducts, createMapping } from '../lib/api.js'
 import SearchableSelect from '../components/SearchableSelect.jsx'
+import { useToast, parseError } from '../contexts/ToastContext.jsx'
 
 // Mode Selection: AI vs Manual
 function ModeSelect({ onSelect }) {
@@ -26,7 +27,7 @@ function ModeSelect({ onSelect }) {
             <div className="flex items-center gap-2 mt-3 text-[11px] text-primary font-medium">
               <span>الأسرع</span>
               <span className="text-text-muted/40">·</span>
-              <span>للفواتير الورقية</span>
+              <span>للفواتير الإلكترونية</span>
             </div>
           </div>
         </div>
@@ -48,7 +49,7 @@ function ModeSelect({ onSelect }) {
             <div className="flex items-center gap-2 mt-3 text-[11px] text-blue-600 font-medium">
               <span>دقة كاملة</span>
               <span className="text-text-muted/40">·</span>
-              <span>للفواتير الإلكترونية</span>
+              <span>للفواتير الورقية</span>
             </div>
           </div>
         </div>
@@ -299,6 +300,7 @@ function MatchStep({ data, products, vendors, onPush, onBack, isManual = false }
   const [templates, setTemplates] = useState(() => isManual ? loadTemplates() : [])
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
   const [templateName, setTemplateName] = useState('')
+  const toast = useToast()
 
   const applyTemplate = (tpl) => {
     // Set vendor if matches
@@ -368,12 +370,12 @@ function MatchStep({ data, products, vendors, onPush, onBack, isManual = false }
 
   const handlePush = async () => {
     if (!vendorId) {
-      setError('اختر المورد من القائمة')
+      toast.warning('اختر المورد من القائمة', { title: 'بيانات ناقصة' })
       return
     }
     const unmatched = items.filter(i => !i.matched_product_id)
     if (unmatched.length) {
-      setError(`${unmatched.length} بنود بدون مطابقة — اختر البند المقابل من القائمة`)
+      toast.warning(`${unmatched.length} بنود بدون مطابقة — اختر البند المقابل من القائمة`, { title: 'بنود غير مكتملة' })
       return
     }
     setSaving(true)
@@ -382,7 +384,8 @@ function MatchStep({ data, products, vendors, onPush, onBack, isManual = false }
       console.log('Pushing with vendor:', vendorId, selectedVendor?.name)
       await onPush({ vendorId, vendor: selectedVendor?.name || '', invoiceNum, invoiceDate, dueDate, items, isInclusive: data.is_inclusive ?? false })
     } catch (e) {
-      setError(e.message)
+      const p = parseError(e)
+      toast.error(p.message, { title: p.title || 'فشل الإرسال' })
     } finally {
       setSaving(false)
     }
@@ -731,6 +734,7 @@ export default function UploadInvoice() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [doneCount, setDoneCount] = useState(0)
+  const toast = useToast()
 
   const startManualMode = async () => {
     setMode('manual')
@@ -748,7 +752,8 @@ export default function UploadInvoice() {
       setMatchedItems([])
       setStep('match')
     } catch (e) {
-      setError(e.message)
+      const p = parseError(e)
+      toast.error(p.message, { title: p.title })
       setMode(null)
     } finally {
       setLoading(false)
@@ -769,7 +774,8 @@ export default function UploadInvoice() {
       if (!vendors.length) setVendors(vendorsResult.vendors || [])
       setStep('match')
     } catch (e) {
-      setError(e.message)
+      const p = parseError(e)
+      toast.error(p.message, { title: p.title })
     } finally {
       setLoading(false)
     }
@@ -825,6 +831,8 @@ export default function UploadInvoice() {
     if (mode === 'manual' && /^BILL\d+$/.test(invoiceNum)) {
       bumpInvoiceCounter()
     }
+
+    toast.success(`تم تسجيل الفاتورة ${invoiceNum || ''} في قيود`, { title: 'تمت العملية بنجاح' })
 
     const newDone = doneCount + 1
     setDoneCount(newDone)
