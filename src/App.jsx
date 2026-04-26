@@ -11,6 +11,7 @@ import Invoices from './pages/Invoices'
 import Payments from './pages/Payments'
 import HistoryLog from './pages/HistoryLog'
 import SettingsPage from './pages/SettingsPage'
+import Updates from './pages/Updates'
 import { useAuth } from './contexts/AuthContext'
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
         <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><HistoryLog /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/updates" element={<ProtectedRoute><Updates /></ProtectedRoute>} />
       </Route>
 
       {/* Catch-all */}

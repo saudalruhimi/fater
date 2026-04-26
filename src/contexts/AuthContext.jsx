@@ -8,7 +8,7 @@ const USERS = [
 ]
 
 // Routes the UPLOADER role can access
-export const UPLOADER_ALLOWED_ROUTES = ['/', '/upload', '/vendors', '/products', '/dictionary', '/settings']
+export const UPLOADER_ALLOWED_ROUTES = ['/', '/upload', '/invoices', '/vendors', '/products', '/dictionary', '/settings', '/updates']
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {

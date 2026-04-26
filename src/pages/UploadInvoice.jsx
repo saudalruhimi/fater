@@ -1,10 +1,61 @@
 import {
   Upload, FileText, X, Image, Trash2, CheckCircle2, CloudUpload,
-  Sparkles, File, Loader2, AlertCircle, Send, ArrowRight,
+  Sparkles, File, Loader2, AlertCircle, Send, ArrowRight, Plus, Pencil, ArrowLeft, Bookmark, Star,
 } from 'lucide-react'
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { scanInvoice, matchItems, pushToQoyod, getInventories, getVendors, createMapping } from '../lib/api.js'
+import { scanInvoice, matchItems, pushToQoyod, getInventories, getVendors, getProducts, createMapping } from '../lib/api.js'
 import SearchableSelect from '../components/SearchableSelect.jsx'
+
+// Mode Selection: AI vs Manual
+function ModeSelect({ onSelect }) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 max-w-3xl mx-auto">
+      <button
+        onClick={() => onSelect('ai')}
+        className="group relative bg-white rounded-2xl border-2 border-border-light hover:border-primary p-6 sm:p-8 text-right transition-all card-hover"
+      >
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-primary-50 flex items-center justify-center flex-shrink-0 group-hover:bg-primary group-hover:text-white transition-colors">
+            <Sparkles className="w-6 h-6 text-primary group-hover:text-white" strokeWidth={1.6} />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-base font-bold text-text mb-1.5">عبر الذكاء الاصطناعي</h3>
+            <p className="text-[12px] text-text-muted leading-relaxed">
+              ارفع صورة الفاتورة أو ملف PDF — يقرأ الذكاء الاصطناعي البيانات تلقائياً ويستخرج المورد والبنود والمبالغ.
+            </p>
+            <div className="flex items-center gap-2 mt-3 text-[11px] text-primary font-medium">
+              <span>الأسرع</span>
+              <span className="text-text-muted/40">·</span>
+              <span>للفواتير الورقية</span>
+            </div>
+          </div>
+        </div>
+      </button>
+
+      <button
+        onClick={() => onSelect('manual')}
+        className="group relative bg-white rounded-2xl border-2 border-border-light hover:border-primary p-6 sm:p-8 text-right transition-all card-hover"
+      >
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+            <Pencil className="w-6 h-6 text-blue-500 group-hover:text-white" strokeWidth={1.6} />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-base font-bold text-text mb-1.5">إدخال يدوي</h3>
+            <p className="text-[12px] text-text-muted leading-relaxed">
+              أدخل بيانات الفاتورة بنفسك — اختر المورد والبنود وأكتب الكميات والأسعار، ثم أرسلها لقيود مباشرة.
+            </p>
+            <div className="flex items-center gap-2 mt-3 text-[11px] text-blue-600 font-medium">
+              <span>دقة كاملة</span>
+              <span className="text-text-muted/40">·</span>
+              <span>للفواتير الإلكترونية</span>
+            </div>
+          </div>
+        </div>
+      </button>
+    </div>
+  )
+}
 
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + ' B'
@@ -188,8 +239,38 @@ function UploadStep({ onScanned }) {
   )
 }
 
-// Step 2: Review & Match
-function MatchStep({ data, products, vendors, onPush, onBack }) {
+// Templates storage helpers (localStorage)
+const TEMPLATES_KEY = 'manual_invoice_templates'
+function loadTemplates() {
+  try {
+    const raw = localStorage.getItem(TEMPLATES_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+function saveTemplates(list) {
+  try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list)) } catch { /* ignore */ }
+}
+
+// Manual invoice number counter
+const COUNTER_KEY = 'manual_invoice_counter'
+const COUNTER_START = 268
+function getNextInvoiceNumber() {
+  try {
+    const raw = localStorage.getItem(COUNTER_KEY)
+    const n = raw ? Number(raw) : COUNTER_START
+    return `BILL${n}`
+  } catch { return `BILL${COUNTER_START}` }
+}
+function bumpInvoiceCounter() {
+  try {
+    const raw = localStorage.getItem(COUNTER_KEY)
+    const n = raw ? Number(raw) : COUNTER_START
+    localStorage.setItem(COUNTER_KEY, String(n + 1))
+  } catch { /* ignore */ }
+}
+
+// Step 2: Review & Match (also used for Manual mode)
+function MatchStep({ data, products, vendors, onPush, onBack, isManual = false }) {
   const [items, setItems] = useState(data.items || [])
   const [vendorId, setVendorId] = useState(() => {
     if (!data.vendor_name || !vendors.length) return null
@@ -215,9 +296,68 @@ function MatchStep({ data, products, vendors, onPush, onBack }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [templates, setTemplates] = useState(() => isManual ? loadTemplates() : [])
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+
+  const applyTemplate = (tpl) => {
+    // Set vendor if matches
+    const v = vendors.find(v => v.id === tpl.vendor_id) || vendors.find(v => v.name === tpl.vendor_name)
+    if (v) setVendorId(v.id)
+    // Add items
+    const newItems = tpl.items.map(it => {
+      const p = products.find(p => p.id === it.matched_product_id) || products.find(p => p.name === it.matched_product_name)
+      return {
+        description: it.description || p?.name || '',
+        quantity: it.quantity,
+        unit_price: it.unit_price,
+        matched_product_id: p?.id || null,
+        matched_product_name: p?.name || null,
+        match_type: p ? 'manual' : 'unmatched',
+      }
+    })
+    setItems(prev => [...prev, ...newItems])
+  }
+
+  const saveAsTemplate = () => {
+    if (!templateName.trim()) return
+    const v = vendors.find(v => v.id === vendorId)
+    const tpl = {
+      id: crypto.randomUUID(),
+      name: templateName.trim(),
+      vendor_id: vendorId,
+      vendor_name: v?.name || '',
+      items: items.map(i => ({
+        description: i.description,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        matched_product_id: i.matched_product_id,
+        matched_product_name: i.matched_product_name,
+      })),
+    }
+    const next = [...templates, tpl]
+    setTemplates(next)
+    saveTemplates(next)
+    setTemplateName('')
+    setShowSaveTemplate(false)
+  }
+
+  const deleteTemplate = (id) => {
+    const next = templates.filter(t => t.id !== id)
+    setTemplates(next)
+    saveTemplates(next)
+  }
 
   const updateItem = (idx, field, value) => {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
+  }
+
+  const addItem = () => {
+    setItems(prev => [...prev, { description: '', quantity: 1, unit_price: 0, matched_product_id: null, matched_product_name: null, match_type: 'unmatched' }])
+  }
+
+  const removeItem = (idx) => {
+    setItems(prev => prev.filter((_, i) => i !== idx))
   }
 
   const calcLineTotal = (item) => {
@@ -265,6 +405,68 @@ function MatchStep({ data, products, vendors, onPush, onBack }) {
 
   return (
     <div className="space-y-5">
+      {/* Quick Templates (Manual mode only) */}
+      {isManual && (
+        <div className="bg-white rounded-2xl border border-border-light p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Bookmark className="w-4 h-4 text-primary" strokeWidth={1.8} />
+              <h3 className="text-sm font-semibold text-text">القوالب السريعة</h3>
+              <span className="text-[11px] text-text-muted">({templates.length})</span>
+            </div>
+            <button onClick={() => setShowSaveTemplate(!showSaveTemplate)}
+              disabled={!vendorId || items.length === 0}
+              className="flex items-center gap-1.5 text-[12px] font-medium text-primary hover:bg-primary-50 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              <Plus className="w-3.5 h-3.5" strokeWidth={2.2} /> حفظ كقالب
+            </button>
+          </div>
+
+          {showSaveTemplate && (
+            <div className="flex items-center gap-2 mb-3 p-2.5 bg-surface-light rounded-xl">
+              <input
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="اسم القالب (مثال: فاتورة أسمنت شهرية)"
+                className="flex-1 bg-white border border-border-light rounded-lg py-1.5 px-3 text-[13px] focus:outline-none focus:border-primary/40"
+                autoFocus
+              />
+              <button onClick={saveAsTemplate} disabled={!templateName.trim()}
+                className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white text-[12px] font-medium transition-colors disabled:opacity-40">
+                حفظ
+              </button>
+              <button onClick={() => { setShowSaveTemplate(false); setTemplateName('') }}
+                className="p-1.5 rounded-lg text-text-muted hover:bg-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {templates.length === 0 ? (
+            <div className="py-6 text-center">
+              <Star className="w-6 h-6 text-text-muted/30 mx-auto mb-2" strokeWidth={1.4} />
+              <p className="text-[12px] text-text-muted">لا توجد قوالب محفوظة بعد</p>
+              <p className="text-[11px] text-text-muted/70 mt-1">أدخل فاتورة وضع المورد والبنود ثم اضغط "حفظ كقالب"</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {templates.map(tpl => (
+                <div key={tpl.id} className="group relative bg-surface-light hover:bg-primary-50 border border-border-light hover:border-primary/30 rounded-xl p-3 transition-all">
+                  <button onClick={() => applyTemplate(tpl)} className="text-right w-full">
+                    <p className="text-[12px] font-semibold text-text truncate pl-6">{tpl.name}</p>
+                    <p className="text-[11px] text-text-muted truncate mt-0.5">{tpl.vendor_name || '—'}</p>
+                    <p className="text-[10px] text-text-muted/80 mt-0.5">{tpl.items.length} بند</p>
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl.id) }}
+                    className="absolute top-2 left-2 p-1 rounded text-text-muted/40 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Invoice preview + Header info */}
       <div className={`grid gap-4 ${data._previewUrl ? 'grid-cols-1 lg:grid-cols-[200px_1fr]' : 'grid-cols-1'}`}>
         {/* Image preview thumbnail */}
@@ -338,21 +540,40 @@ function MatchStep({ data, products, vendors, onPush, onBack }) {
 
       {/* Items table */}
       <div className="bg-white rounded-2xl border border-border-light overflow-hidden">
-        <div className="px-5 py-3 border-b border-border-light">
+        <div className="px-5 py-3 border-b border-border-light flex items-center justify-between">
           <h3 className="text-sm font-semibold text-text">البنود ({items.length})</h3>
+          {isManual && (
+            <button onClick={addItem}
+              className="flex items-center gap-1.5 text-[12px] font-medium text-primary hover:bg-primary-50 px-2.5 py-1 rounded-lg transition-colors">
+              <Plus className="w-3.5 h-3.5" strokeWidth={2.2} /> إضافة بند
+            </button>
+          )}
         </div>
 
         <div className="divide-y divide-border-light/60">
+          {items.length === 0 && isManual && (
+            <div className="py-12 flex flex-col items-center text-center">
+              <FileText className="w-8 h-8 text-text-muted/30 mb-2" />
+              <p className="text-sm text-text-muted">لا توجد بنود — أضف بنداً للبدء</p>
+              <button onClick={addItem}
+                className="mt-3 flex items-center gap-1.5 text-[12px] font-medium text-primary hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors">
+                <Plus className="w-3.5 h-3.5" strokeWidth={2.2} /> إضافة بند
+              </button>
+            </div>
+          )}
           {items.map((item, idx) => (
             <div key={idx} className="p-4 space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 {/* Original description */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] text-text-muted mb-0.5">البند بالفاتورة</p>
-                  <p className="text-[13px] font-medium text-text">{item.description}</p>
-                </div>
-
-                <ArrowRight className="w-4 h-4 text-text-muted hidden sm:block flex-shrink-0" />
+                {!isManual && (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] text-text-muted mb-0.5">البند بالفاتورة</p>
+                      <p className="text-[13px] font-medium text-text">{item.description}</p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-text-muted hidden sm:block flex-shrink-0" />
+                  </>
+                )}
 
                 {/* Matched product */}
                 <div className="flex-1 min-w-0">
@@ -364,6 +585,9 @@ function MatchStep({ data, products, vendors, onPush, onBack }) {
                       const p = products.find(p => p.id === id)
                       updateItem(idx, 'matched_product_id', p?.id || null)
                       updateItem(idx, 'matched_product_name', p?.name || null)
+                      if (isManual && p?.name && !item.description) {
+                        updateItem(idx, 'description', p.name)
+                      }
                       updateItem(idx, 'match_type', p ? 'manual' : 'unmatched')
                     }}
                     placeholder="-- اختر البند --"
@@ -371,22 +595,55 @@ function MatchStep({ data, products, vendors, onPush, onBack }) {
                   />
                 </div>
 
-                {/* Status badge */}
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap self-start sm:self-center ${matchColor(item.match_type)}`}>
-                  {matchLabel(item.match_type)}
-                </span>
+                {/* Status badge or delete */}
+                {isManual ? (
+                  <button onClick={() => removeItem(idx)}
+                    className="self-start sm:self-center p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap self-start sm:self-center ${matchColor(item.match_type)}`}>
+                    {matchLabel(item.match_type)}
+                  </span>
+                )}
               </div>
 
               {/* Qty, price, discount, total */}
               <div className="flex flex-wrap items-center gap-3 text-[13px]">
                 <div className="flex items-center gap-1.5">
                   <span className="text-text-muted text-[11px]">كمية:</span>
-                  <input type="number" value={item.quantity} onChange={e => updateItem(idx, 'quantity', Number(e.target.value))}
-                    className="w-16 bg-surface-light border border-border-light rounded-lg py-1 px-2 text-center text-text focus:outline-none" dir="ltr" />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={item.quantity ?? ''}
+                    onChange={e => {
+                      const v = e.target.value.replace(',', '.')
+                      if (v === '' || /^\d*\.?\d*$/.test(v)) {
+                        updateItem(idx, 'quantity', v === '' || v === '.' ? '' : v)
+                      }
+                    }}
+                    onBlur={e => {
+                      const n = parseFloat(e.target.value)
+                      updateItem(idx, 'quantity', isNaN(n) ? 0 : n)
+                    }}
+                    className="w-20 bg-surface-light border border-border-light rounded-lg py-1 px-2 text-center text-text focus:outline-none" dir="ltr" />
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-text-muted text-[11px]">سعر:</span>
-                  <input type="number" step="0.01" value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', Number(e.target.value))}
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={item.unit_price ?? ''}
+                    onChange={e => {
+                      const v = e.target.value.replace(',', '.')
+                      if (v === '' || /^\d*\.?\d*$/.test(v)) {
+                        updateItem(idx, 'unit_price', v === '' || v === '.' ? '' : v)
+                      }
+                    }}
+                    onBlur={e => {
+                      const n = parseFloat(e.target.value)
+                      updateItem(idx, 'unit_price', isNaN(n) ? 0 : n)
+                    }}
                     className="w-24 bg-surface-light border border-border-light rounded-lg py-1 px-2 text-center text-text focus:outline-none" dir="ltr" />
                 </div>
                 <span className="text-text-muted text-[11px]">الإجمالي:</span>
@@ -397,10 +654,10 @@ function MatchStep({ data, products, vendors, onPush, onBack }) {
         </div>
 
         {/* Totals */}
-        {(() => {
+        {items.length > 0 && (() => {
           const subtotal = items.reduce((s, i) => s + calcLineTotal(i), 0)
-          const vatAmount = data.vat_amount || subtotal * 0.15
-          const totalAmount = data.total_amount || (subtotal + vatAmount)
+          const vatAmount = isManual ? subtotal * 0.15 : (data.vat_amount || subtotal * 0.15)
+          const totalAmount = isManual ? (subtotal + vatAmount) : (data.total_amount || (subtotal + vatAmount))
           return (
             <div className="border-t border-border-light">
               <div className="px-5 py-2 flex items-center justify-between">
@@ -463,6 +720,7 @@ function SuccessStep({ count, onReset }) {
 
 // Main component
 export default function UploadInvoice() {
+  const [mode, setMode] = useState(null) // null | 'ai' | 'manual'
   const [step, setStep] = useState('upload') // upload | match | success
   const [allScanned, setAllScanned] = useState([]) // array of scanned invoices
   const [currentIdx, setCurrentIdx] = useState(0)
@@ -473,6 +731,29 @@ export default function UploadInvoice() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [doneCount, setDoneCount] = useState(0)
+
+  const startManualMode = async () => {
+    setMode('manual')
+    setLoading(true)
+    setError(null)
+    try {
+      const [vendorsResult, productsResult] = await Promise.all([
+        getVendors(),
+        getProducts(),
+      ])
+      setVendors(vendorsResult.vendors || [])
+      setProducts(productsResult.products || [])
+      const today = new Date().toISOString().split('T')[0]
+      setScannedData({ items: [], vendor_name: '', invoice_number: getNextInvoiceNumber(), invoice_date: today, due_date: today })
+      setMatchedItems([])
+      setStep('match')
+    } catch (e) {
+      setError(e.message)
+      setMode(null)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const loadInvoice = async (data) => {
     setScannedData(data)
@@ -540,6 +821,11 @@ export default function UploadInvoice() {
       })),
     })
 
+    // Bump invoice counter for manual mode
+    if (mode === 'manual' && /^BILL\d+$/.test(invoiceNum)) {
+      bumpInvoiceCounter()
+    }
+
     const newDone = doneCount + 1
     setDoneCount(newDone)
 
@@ -554,6 +840,7 @@ export default function UploadInvoice() {
   }
 
   const reset = () => {
+    setMode(null)
     setStep('upload')
     setScannedData(null)
     setMatchedItems(null)
@@ -567,27 +854,40 @@ export default function UploadInvoice() {
   return (
     <div className="max-w-5xl animate-page">
       <div className="mb-6 sm:mb-8">
-        <h1 className="text-lg sm:text-xl font-bold text-text">رفع الفواتير</h1>
-        <p className="text-xs sm:text-sm text-text-muted mt-1">
-          {step === 'upload' && 'ارفع صورة الفاتورة لقراءتها بالذكاء الاصطناعي'}
-          {step === 'match' && (allScanned.length > 1
-            ? `فاتورة ${currentIdx + 1} من ${allScanned.length} — راجع البيانات وطابق البنود`
-            : 'راجع البيانات المستخرجة وطابق البنود')}
-          {step === 'success' && 'تمت العملية بنجاح'}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            <h1 className="text-lg sm:text-xl font-bold text-text">رفع الفواتير</h1>
+            <p className="text-xs sm:text-sm text-text-muted mt-1">
+              {mode === null && 'اختر طريقة إدخال الفاتورة'}
+              {mode === 'ai' && step === 'upload' && 'ارفع صورة الفاتورة لقراءتها بالذكاء الاصطناعي'}
+              {step === 'match' && (allScanned.length > 1
+                ? `فاتورة ${currentIdx + 1} من ${allScanned.length} — راجع البيانات وطابق البنود`
+                : mode === 'manual' ? 'أدخل بيانات الفاتورة يدوياً' : 'راجع البيانات المستخرجة وطابق البنود')}
+              {step === 'success' && 'تمت العملية بنجاح'}
+            </p>
+          </div>
+          {mode && step !== 'success' && (
+            <button onClick={reset}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-text-muted hover:text-primary-dark hover:bg-primary-50 transition-colors flex-shrink-0">
+              <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2} />
+              <span className="hidden sm:inline">اختر نمط آخر</span>
+              <span className="sm:hidden">رجوع</span>
+            </button>
+          )}
+        </div>
 
-        {/* Steps indicator */}
-        {step !== 'success' && (
+        {/* Steps indicator (hide on mode select) */}
+        {mode && step !== 'success' && (
           <div className="flex items-center gap-2 mt-4">
-            {['رفع', 'مطابقة', 'إرسال'].map((s, i) => {
-              const stepIdx = step === 'upload' ? 0 : 1
+            {(mode === 'ai' ? ['رفع', 'مطابقة', 'إرسال'] : ['الإدخال', 'الإرسال']).map((s, i) => {
+              const stepIdx = mode === 'ai' ? (step === 'upload' ? 0 : 1) : 0
               return (
                 <div key={s} className="flex items-center gap-2">
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
                     i <= stepIdx ? 'bg-primary text-white' : 'bg-surface-lighter text-text-muted'
                   }`}>{i + 1}</div>
                   <span className={`text-[12px] font-medium ${i <= stepIdx ? 'text-text' : 'text-text-muted'}`}>{s}</span>
-                  {i < 2 && <div className={`w-8 h-px ${i < stepIdx ? 'bg-primary' : 'bg-border-light'}`} />}
+                  {i < (mode === 'ai' ? 2 : 1) && <div className={`w-8 h-px ${i < stepIdx ? 'bg-primary' : 'bg-border-light'}`} />}
                 </div>
               )
             })}
@@ -598,7 +898,7 @@ export default function UploadInvoice() {
       {loading && (
         <div className="flex flex-col items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
-          <p className="text-sm text-text-muted">جارِ مطابقة البنود مع قيود...</p>
+          <p className="text-sm text-text-muted">{mode === 'manual' ? 'جارِ تحميل البيانات...' : 'جارِ مطابقة البنود مع قيود...'}</p>
         </div>
       )}
 
@@ -609,7 +909,10 @@ export default function UploadInvoice() {
         </div>
       )}
 
-      {!loading && step === 'upload' && <UploadStep onScanned={handleScanned} />}
+      {!loading && mode === null && (
+        <ModeSelect onSelect={(m) => m === 'ai' ? setMode('ai') : startManualMode()} />
+      )}
+      {!loading && mode === 'ai' && step === 'upload' && <UploadStep onScanned={handleScanned} />}
       {!loading && step === 'match' && (
         <MatchStep
           data={{ ...scannedData, items: matchedItems || scannedData?.items }}
@@ -617,6 +920,7 @@ export default function UploadInvoice() {
           vendors={vendors}
           onPush={handlePush}
           onBack={reset}
+          isManual={mode === 'manual'}
         />
       )}
       {step === 'success' && <SuccessStep count={doneCount} onReset={reset} />}
