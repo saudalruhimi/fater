@@ -35,7 +35,7 @@ function timeAgo(date) {
 // Bump this when you publish a new update entry in pages/Updates.jsx (use date or date+suffix)
 const LATEST_UPDATE_DATE = '2026-04-26-2'
 const LATEST_UPDATE_VERSION = 'v1.3.0'
-const LATEST_UPDATE_TITLE = 'الوضع الليلي + نظام Toast الذكي'
+const LATEST_UPDATE_TITLE = 'لمسات تستحق التجربة...'
 
 export default function Layout() {
   const location = useLocation()
