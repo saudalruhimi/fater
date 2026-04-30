@@ -89,6 +89,32 @@ export async function deleteVendor(id) {
   return request('DELETE', `/vendors/${id}`)
 }
 
+// Find next available BILL-N reference by scanning Qoyod bills
+export async function getNextBillNumber({ prefix = 'BILL', maxPages = 15 } = {}) {
+  let max = 0
+  const re = new RegExp(`^${prefix}(\\d+)$`, 'i')
+  for (let page = 1; page <= maxPages; page++) {
+    let bills
+    try {
+      const data = await request('GET', `/bills?page=${page}`)
+      bills = data.bills || []
+    } catch {
+      break
+    }
+    if (!bills.length) break
+    for (const b of bills) {
+      const ref = String(b.reference || '')
+      const m = ref.match(re)
+      if (m) {
+        const n = parseInt(m[1], 10)
+        if (!isNaN(n) && n > max) max = n
+      }
+    }
+    if (bills.length < 100) break
+  }
+  return { prefix, last: max, next: max + 1, suggested: `${prefix}${max + 1}` }
+}
+
 // Bills
 export async function createBill({ contact_id, status, issue_date, due_date, reference, inventory_id, line_items }) {
   const result = await request('POST', '/bills', {

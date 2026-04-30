@@ -52,6 +52,7 @@ export function getVendors() { return request('GET', '/qoyod/vendors') }
 export function getInventories() { return request('GET', '/qoyod/inventories') }
 export function testQoyodConnection() { return request('GET', '/qoyod/test') }
 export function updateQoyodKey(api_key) { return request('POST', '/qoyod/update-key', { api_key }) }
+export function getNextBillNumber(prefix = 'BILL') { return request('GET', `/qoyod/next-bill-number?prefix=${encodeURIComponent(prefix)}`) }
 
 // Accounts & Bill Payments
 export function getAccounts() { return request('GET', '/qoyod/accounts') }
@@ -63,8 +64,14 @@ export function createVendor(data) { return request('POST', '/qoyod/vendors', da
 export function updateVendor(id, data) { return request('PUT', `/qoyod/vendors/${id}`, data) }
 export function deleteVendor(id) { return request('DELETE', `/qoyod/vendors/${id}`) }
 
-// Mappings
+// Mappings (items)
 export function getMappings() { return request('GET', '/mappings') }
 export function createMapping(data) { return request('POST', '/mappings', data) }
 export function updateMapping(id, data) { return request('PUT', `/mappings/${id}`, data) }
 export function deleteMapping(id) { return request('DELETE', `/mappings/${id}`) }
+
+// Vendor Mappings
+export function getVendorMappings() { return request('GET', '/vendor-mappings') }
+export function createVendorMapping(data) { return request('POST', '/vendor-mappings', data) }
+export function updateVendorMapping(id, data) { return request('PUT', `/vendor-mappings/${id}`, data) }
+export function deleteVendorMapping(id) { return request('DELETE', `/vendor-mappings/${id}`) }

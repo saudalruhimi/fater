@@ -344,6 +344,34 @@ app.post('/api/qoyod/push', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// GET /api/qoyod/next-bill-number — find next available BILL-N reference
+app.get('/api/qoyod/next-bill-number', async (req, res) => {
+  try {
+    const prefix = req.query.prefix || 'BILL'
+    const re = new RegExp(`^${prefix}(\\d+)$`, 'i')
+    let max = 0
+    for (let page = 1; page <= 15; page++) {
+      let bills
+      try {
+        const data = await qoyodRequest('GET', `/bills?page=${page}`)
+        bills = data.bills || []
+      } catch { break }
+      if (!bills.length) break
+      for (const b of bills) {
+        const m = String(b.reference || '').match(re)
+        if (m) {
+          const n = parseInt(m[1], 10)
+          if (!isNaN(n) && n > max) max = n
+        }
+      }
+      if (bills.length < 100) break
+    }
+    res.json({ success: true, prefix, last: max, next: max + 1, suggested: `${prefix}${max + 1}` })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // GET /api/qoyod/products
 app.get('/api/qoyod/products', async (req, res) => {
   try { res.json({ success: true, products: await getProducts() }) } catch (e) { res.status(500).json({ error: e.message }) }
@@ -443,6 +471,37 @@ app.put('/api/mappings/:id', async (req, res) => {
 
 app.delete('/api/mappings/:id', async (req, res) => {
   try { await supabase.from('item_mappings').delete().eq('id', req.params.id); res.json({ success: true }) } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// CRUD /api/vendor-mappings
+app.get('/api/vendor-mappings', async (req, res) => {
+  try { const { data } = await supabase.from('vendor_mappings').select('*').order('times_used', { ascending: false }); res.json({ success: true, mappings: data || [] }) } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.post('/api/vendor-mappings', async (req, res) => {
+  try {
+    const { invoice_vendor_name, qoyod_vendor_id, qoyod_vendor_name } = req.body
+    if (!invoice_vendor_name || !qoyod_vendor_id) return res.status(400).json({ error: 'بيانات ناقصة' })
+    const { data: existing } = await supabase.from('vendor_mappings').select('*').eq('invoice_vendor_name', invoice_vendor_name).eq('qoyod_vendor_id', qoyod_vendor_id).single()
+    if (existing) {
+      const { data } = await supabase.from('vendor_mappings').update({ times_used: (existing.times_used || 1) + 1, updated_at: new Date().toISOString() }).eq('id', existing.id).select().single()
+      return res.json({ success: true, mapping: data, updated: true })
+    }
+    const { data } = await supabase.from('vendor_mappings').insert({ invoice_vendor_name, qoyod_vendor_id, qoyod_vendor_name }).select().single()
+    res.json({ success: true, mapping: data })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.put('/api/vendor-mappings/:id', async (req, res) => {
+  try {
+    const updates = { ...req.body, updated_at: new Date().toISOString() }
+    const { data } = await supabase.from('vendor_mappings').update(updates).eq('id', req.params.id).select().single()
+    res.json({ success: true, mapping: data })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.delete('/api/vendor-mappings/:id', async (req, res) => {
+  try { await supabase.from('vendor_mappings').delete().eq('id', req.params.id); res.json({ success: true }) } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 // ============ Telegram Bot ============

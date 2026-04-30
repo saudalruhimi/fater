@@ -63,6 +63,17 @@ router.post('/push', async (req, res) => {
 })
 
 // GET /api/qoyod/products
+// GET /api/qoyod/next-bill-number — find next available BILL-N reference from Qoyod
+router.get('/next-bill-number', async (req, res) => {
+  try {
+    const prefix = req.query.prefix || 'BILL'
+    const result = await qoyod.getNextBillNumber({ prefix })
+    res.json({ success: true, ...result })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 router.get('/products', async (req, res) => {
   try {
     const products = await qoyod.getProducts()

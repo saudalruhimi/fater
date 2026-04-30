@@ -3,7 +3,7 @@ import {
   Sparkles, File, Loader2, AlertCircle, Send, ArrowRight, Plus, Pencil, ArrowLeft, Bookmark, Star,
 } from 'lucide-react'
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { scanInvoice, matchItems, pushToQoyod, getInventories, getVendors, getProducts, createMapping } from '../lib/api.js'
+import { scanInvoice, matchItems, pushToQoyod, getInventories, getVendors, getProducts, createMapping, createVendorMapping, getVendorMappings, getNextBillNumber } from '../lib/api.js'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import { useToast, parseError } from '../contexts/ToastContext.jsx'
 
@@ -261,7 +261,7 @@ function saveTemplates(list) {
   try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list)) } catch { /* ignore */ }
 }
 
-// Manual invoice number counter
+// Manual invoice number counter (local fallback if Qoyod is unreachable)
 const COUNTER_KEY = 'manual_invoice_counter'
 const COUNTER_START = 268
 function getNextInvoiceNumber() {
@@ -270,6 +270,9 @@ function getNextInvoiceNumber() {
     const n = raw ? Number(raw) : COUNTER_START
     return `BILL${n}`
   } catch { return `BILL${COUNTER_START}` }
+}
+function setLocalCounter(n) {
+  try { localStorage.setItem(COUNTER_KEY, String(n)) } catch { /* ignore */ }
 }
 function bumpInvoiceCounter() {
   try {
@@ -280,14 +283,26 @@ function bumpInvoiceCounter() {
 }
 
 // Step 2: Review & Match (also used for Manual mode)
-function MatchStep({ data, products, vendors, onPush, onBack, isManual = false }) {
+function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBack, isManual = false }) {
   const [items, setItems] = useState(data.items || [])
   const [vendorId, setVendorId] = useState(() => {
     if (!data.vendor_name || !vendors.length) return null
+    const activeVendors = vendors.filter(v => (v.status || 'Active') === 'Active')
+
+    // 1. Check vendor mappings dictionary first (exact match)
+    const normalize = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ')
+    const targetName = normalize(data.vendor_name)
+    const mapped = vendorMappings.find(m => normalize(m.invoice_vendor_name) === targetName)
+    if (mapped) {
+      const v = activeVendors.find(v => v.id === mapped.qoyod_vendor_id)
+      if (v) return v.id
+    }
+
+    // 2. Word-overlap fuzzy match
     const words = data.vendor_name.split(/\s+/).filter(w => w.length > 2)
     let bestMatch = null
     let bestScore = 0
-    for (const v of vendors) {
+    for (const v of activeVendors) {
       const target = (v.name + ' ' + (v.organization || '')).toLowerCase()
       let score = 0
       for (const word of words) {
@@ -391,7 +406,14 @@ function MatchStep({ data, products, vendors, onPush, onBack, isManual = false }
     setError(null)
     try {
       console.log('Pushing with vendor:', vendorId, selectedVendor?.name)
-      await onPush({ vendorId, vendor: selectedVendor?.name || '', invoiceNum, invoiceDate, dueDate, items, isInclusive: data.is_inclusive ?? false })
+      await onPush({
+        vendorId,
+        vendor: selectedVendor?.name || '',
+        invoiceNum, invoiceDate, dueDate, items,
+        isInclusive: data.is_inclusive ?? false,
+        // Pass original invoice vendor name so parent can save vendor mapping
+        originalVendorName: data.vendor_name || '',
+      })
     } catch (e) {
       const p = parseError(e)
       toast.error(p.message, { title: p.title || 'فشل الإرسال' })
@@ -522,7 +544,7 @@ function MatchStep({ data, products, vendors, onPush, onBack, isManual = false }
         <div>
           <label className="block text-[12px] font-medium text-text-muted mb-1">المورد</label>
           <SearchableSelect
-            options={vendors.map(v => ({ id: v.id, label: v.name }))}
+            options={vendors.filter(v => (v.status || 'Active') === 'Active').map(v => ({ id: v.id, label: v.name }))}
             value={vendorId}
             onChange={setVendorId}
             placeholder="-- اختر المورد --"
@@ -740,6 +762,7 @@ export default function UploadInvoice() {
   const [matchedItems, setMatchedItems] = useState(null)
   const [products, setProducts] = useState([])
   const [vendors, setVendors] = useState([])
+  const [vendorMappings, setVendorMappings] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [doneCount, setDoneCount] = useState(0)
@@ -750,14 +773,25 @@ export default function UploadInvoice() {
     setLoading(true)
     setError(null)
     try {
-      const [vendorsResult, productsResult] = await Promise.all([
+      const [vendorsResult, productsResult, nextNumResult, vmResult] = await Promise.all([
         getVendors(),
         getProducts(),
+        getNextBillNumber('BILL').catch(() => null),
+        getVendorMappings().catch(() => null),
       ])
       setVendors(vendorsResult.vendors || [])
       setProducts(productsResult.products || [])
+      setVendorMappings(vmResult?.mappings || [])
+      // Prefer the live next-number from Qoyod; fall back to local counter if request fails
+      let invoiceNumber
+      if (nextNumResult?.suggested) {
+        invoiceNumber = nextNumResult.suggested
+        setLocalCounter(nextNumResult.next) // sync local counter
+      } else {
+        invoiceNumber = getNextInvoiceNumber()
+      }
       const today = new Date().toISOString().split('T')[0]
-      setScannedData({ items: [], vendor_name: '', invoice_number: getNextInvoiceNumber(), invoice_date: today, due_date: today })
+      setScannedData({ items: [], vendor_name: '', invoice_number: invoiceNumber, invoice_date: today, due_date: today })
       setMatchedItems([])
       setStep('match')
     } catch (e) {
@@ -780,13 +814,15 @@ export default function UploadInvoice() {
           { title: 'الذكاء الاصطناعي مشغول', duration: delay + 500 }
         )
       }
-      const [matchResult, vendorsResult] = await Promise.all([
+      const [matchResult, vendorsResult, vmResult] = await Promise.all([
         matchItems(data.items, data.vendor_name, { onRetry }),
         vendors.length ? { vendors } : getVendors(),
+        vendorMappings.length ? { mappings: vendorMappings } : getVendorMappings().catch(() => ({ mappings: [] })),
       ])
       setMatchedItems(matchResult.items)
       setProducts(matchResult.products)
       if (!vendors.length) setVendors(vendorsResult.vendors || [])
+      if (!vendorMappings.length) setVendorMappings(vmResult?.mappings || [])
       setStep('match')
     } catch (e) {
       const p = parseError(e)
@@ -803,8 +839,19 @@ export default function UploadInvoice() {
     await loadInvoice(results[0])
   }
 
-  const handlePush = async ({ vendorId, vendor, invoiceNum, invoiceDate, dueDate, items, isInclusive }) => {
-    // Save new manual mappings
+  const handlePush = async ({ vendorId, vendor, invoiceNum, invoiceDate, dueDate, items, isInclusive, originalVendorName }) => {
+    // Save vendor mapping if invoice vendor name differs from chosen Qoyod vendor name
+    if (originalVendorName && originalVendorName.trim() && originalVendorName.trim() !== vendor) {
+      try {
+        await createVendorMapping({
+          invoice_vendor_name: originalVendorName.trim(),
+          qoyod_vendor_id: vendorId,
+          qoyod_vendor_name: vendor,
+        })
+      } catch { /* ignore — table may not exist yet */ }
+    }
+
+    // Save new manual item mappings
     for (const item of items) {
       if (item.match_type === 'manual' && item.matched_product_id) {
         try {
@@ -814,7 +861,7 @@ export default function UploadInvoice() {
             qoyod_product_name: item.matched_product_name,
             vendor_name: vendor,
           })
-        } catch {}
+        } catch { /* ignore */ }
       }
     }
 
@@ -941,6 +988,7 @@ export default function UploadInvoice() {
           data={{ ...scannedData, items: matchedItems || scannedData?.items }}
           products={products}
           vendors={vendors}
+          vendorMappings={vendorMappings}
           onPush={handlePush}
           onBack={reset}
           isManual={mode === 'manual'}

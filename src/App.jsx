@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import UploadInvoice from './pages/UploadInvoice'
 import Dictionary from './pages/Dictionary'
+import VendorDictionary from './pages/VendorDictionary'
 import Vendors from './pages/Vendors'
 import Products from './pages/Products'
 import Invoices from './pages/Invoices'
@@ -30,6 +31,7 @@ function App() {
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/upload" element={<ProtectedRoute><UploadInvoice /></ProtectedRoute>} />
         <Route path="/dictionary" element={<ProtectedRoute><Dictionary /></ProtectedRoute>} />
+        <Route path="/vendor-dictionary" element={<ProtectedRoute><VendorDictionary /></ProtectedRoute>} />
         <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
         <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
         <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />

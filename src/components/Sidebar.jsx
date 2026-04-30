@@ -38,7 +38,8 @@ const navSections = [
     items: [
       { to: '/vendors', label: 'الموردين', icon: Users },
       { to: '/products', label: 'البنود', icon: Package },
-      { to: '/dictionary', label: 'قاموس المطابقة', icon: BookOpen },
+      { to: '/dictionary', label: 'قاموس البنود', icon: BookOpen },
+      { to: '/vendor-dictionary', label: 'قاموس الموردين', icon: BookOpen },
     ],
   },
   {
