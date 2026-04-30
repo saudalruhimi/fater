@@ -98,6 +98,23 @@ export function parseError(err) {
     return { title: 'فشل الاتصال', message: 'تأكد من اتصال الإنترنت أو إن السيرفر شغّال' }
   }
 
+  // Gemini AI errors (passed through from backend)
+  if (msg.includes('الذكاء الاصطناعي مشغول')) {
+    return { title: 'الذكاء الاصطناعي مشغول', message: 'تجاوز حد الطلبات. انتظر دقيقة وحاول مرة ثانية', type: 'warning' }
+  }
+  if (msg.includes('حمل عالي')) {
+    return { title: 'الخادم محمّل', message: 'حاول بعد دقيقة', type: 'warning' }
+  }
+  if (msg.includes('مفتاح Gemini')) {
+    return { title: 'مفتاح Gemini غير صالح', message: 'راجع إعدادات النظام' }
+  }
+  if (msg.includes('Resource exhausted') || msg.includes('429')) {
+    return { title: 'الذكاء الاصطناعي مشغول', message: 'تجاوز حد الطلبات في الدقيقة. انتظر قليلاً وحاول مرة ثانية', type: 'warning' }
+  }
+  if (msg.includes('overloaded') || msg.includes('503')) {
+    return { title: 'الخادم محمّل', message: 'الذكاء الاصطناعي يواجه ضغط حالياً، حاول بعد دقيقة', type: 'warning' }
+  }
+
   // Duplicate invoice
   if (msg.includes('reference') && (msg.includes('taken') || msg.includes('duplicate') || msg.includes('exists') || msg.includes('unique'))) {
     return { title: 'فاتورة مكررة', message: 'الفاتورة بهذا الرقم مسجلة مسبقاً في قيود', type: 'warning' }

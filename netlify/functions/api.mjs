@@ -15,6 +15,43 @@ const supabase = createClient(
   process.env.VITE_SUPABASE_ANON_KEY
 )
 
+// ============ Gemini retry helper ============
+const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+
+async function callGeminiWithRetry(fn, { retries = 3, baseDelay = 1500 } = {}) {
+  let lastErr
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn()
+    } catch (e) {
+      lastErr = e
+      const msg = String(e?.message || '')
+      const isRateLimit = msg.includes('429') || msg.includes('Too Many Requests') || msg.includes('Resource exhausted')
+      const isOverloaded = msg.includes('503') || msg.includes('overloaded') || msg.includes('UNAVAILABLE')
+      if (!isRateLimit && !isOverloaded) throw e
+      if (attempt === retries) break
+      const delay = baseDelay * Math.pow(2, attempt) + Math.floor(Math.random() * 500)
+      console.log(`[Gemini retry] attempt ${attempt + 1}/${retries + 1} failed (${isRateLimit ? '429' : '503'}). retrying in ${delay}ms`)
+      await sleep(delay)
+    }
+  }
+  throw lastErr
+}
+
+function geminiErrorMessage(err) {
+  const msg = String(err?.message || '')
+  if (msg.includes('429') || msg.includes('Resource exhausted')) {
+    return 'الذكاء الاصطناعي مشغول حالياً (تجاوز حد الطلبات). انتظر دقيقة وحاول مرة ثانية.'
+  }
+  if (msg.includes('503') || msg.includes('overloaded')) {
+    return 'الذكاء الاصطناعي يواجه حمل عالي حالياً. حاول بعد دقيقة.'
+  }
+  if (msg.includes('401') || msg.includes('API_KEY')) {
+    return 'مفتاح Gemini غير صالح أو منتهي. راجع الإعدادات.'
+  }
+  return msg || 'فشل قراءة الفاتورة'
+}
+
 // ============ Qoyod Helpers ============
 const QOYOD_URL = 'https://api.qoyod.com/2.0'
 
@@ -211,7 +248,10 @@ app.post('/api/scan', upload.single('image'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'لم يتم رفع صورة' })
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-    const result = await model.generateContent([SCAN_PROMPT, { inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype } }])
+    const result = await callGeminiWithRetry(
+      () => model.generateContent([SCAN_PROMPT, { inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype } }]),
+      { retries: 3, baseDelay: 2000 }
+    )
     const text = result.response.text()
     const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) throw new Error('لم يتمكن من استخراج بيانات الفاتورة')
@@ -223,7 +263,12 @@ app.post('/api/scan', upload.single('image'), async (req, res) => {
     })
 
     res.json({ success: true, data })
-  } catch (e) { res.status(500).json({ error: e.message }) }
+  } catch (e) {
+    const msg = String(e?.message || '')
+    const status = msg.includes('429') || msg.includes('Resource exhausted') ? 429 :
+                   msg.includes('503') || msg.includes('overloaded') ? 503 : 500
+    res.status(status).json({ error: geminiErrorMessage(e) })
+  }
 })
 
 // POST /api/match
@@ -252,19 +297,24 @@ app.post('/api/match', async (req, res) => {
       for (const p of products) { const d = levenshtein(normalize(p.name), desc); if (d < bestD) { bestD = d; best = p } }
       if (best && bestD < 8) { results.push({ ...item, match_type: 'fuzzy_product', matched_product_id: best.id, matched_product_name: best.name, confidence: Math.max(0.5, 1 - bestD/20) }); continue }
 
-      // 4. AI match
+      // 4. AI match (with retry — but fail silently for individual items)
       try {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
         const prompt = `عندي بند "${item.description}" من مورد "${vendor_name}". وعندي هالبنود:\n${products.map(p=>`${p.id}: ${p.name}`).join('\n')}\nوش أقرب بند؟ رجع JSON فقط: {"product_id": 0, "product_name": "", "confidence": 0.0}`
-        const r = await model.generateContent(prompt)
+        const r = await callGeminiWithRetry(
+          () => model.generateContent(prompt),
+          { retries: 2, baseDelay: 1000 }
+        )
         const t = r.response.text()
         const jm = t.match(/```json\s*([\s\S]*?)```/) || t.match(/\{[\s\S]*\}/)
         if (jm) {
           const ai = JSON.parse(jm[1] || jm[0])
           if (ai.product_id) { results.push({ ...item, match_type: 'ai', matched_product_id: ai.product_id, matched_product_name: ai.product_name, confidence: ai.confidence || 0.6 }); continue }
         }
-      } catch {}
+      } catch (e) {
+        console.log('[match] AI fallback failed for item:', item.description, e?.message)
+      }
 
       results.push({ ...item, match_type: 'unmatched', matched_product_id: null, matched_product_name: null, confidence: 0 })
     }
