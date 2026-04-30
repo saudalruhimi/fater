@@ -47,7 +47,10 @@ router.post('/', upload.single('image'), async (req, res) => {
     res.json({ success: true, data, invoice_id: record?.id })
   } catch (e) {
     console.error('Scan error:', e)
-    res.status(500).json({ error: e.message || 'فشل في قراءة الفاتورة' })
+    const msg = String(e?.message || '')
+    const status = msg.includes('429') || msg.includes('Resource exhausted') || msg.includes('مشغول') ? 429 :
+                   msg.includes('503') || msg.includes('overloaded') || msg.includes('حمل عالي') ? 503 : 500
+    res.status(status).json({ error: msg || 'فشل في قراءة الفاتورة' })
   }
 })
 

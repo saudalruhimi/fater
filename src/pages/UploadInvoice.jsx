@@ -72,6 +72,7 @@ function UploadStep({ onScanned }) {
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState(null)
   const inputRef = useRef(null)
+  const toast = useToast()
 
   const addFiles = useCallback((newFiles) => {
     const mapped = Array.from(newFiles)
@@ -116,12 +117,20 @@ function UploadStep({ onScanned }) {
     try {
       const results = []
       for (const f of files) {
-        const result = await scanInvoice(f.file)
+        const onRetry = ({ attempt, totalAttempts, delay }) => {
+          toast.warning(
+            `الذكاء الاصطناعي مشغول — محاولة ${attempt}/${totalAttempts} بعد ${(delay / 1000).toFixed(0)}ث`,
+            { title: 'جاري إعادة المحاولة', duration: delay + 500 }
+          )
+        }
+        const result = await scanInvoice(f.file, { onRetry })
         // Attach image preview URL to scanned data
         results.push({ ...result.data, _previewUrl: f.url || null, _isPdf: f.isPdf || false })
       }
       onScanned(results)
     } catch (e) {
+      const p = parseError(e)
+      toast.error(p.message, { title: p.title || 'فشل قراءة الفاتورة' })
       setError(e.message)
     } finally {
       setScanning(false)
@@ -765,8 +774,14 @@ export default function UploadInvoice() {
     setLoading(true)
     setError(null)
     try {
+      const onRetry = ({ attempt, totalAttempts, delay }) => {
+        toast.warning(
+          `جاري إعادة المحاولة... ${attempt}/${totalAttempts} بعد ${(delay / 1000).toFixed(0)}ث`,
+          { title: 'الذكاء الاصطناعي مشغول', duration: delay + 500 }
+        )
+      }
       const [matchResult, vendorsResult] = await Promise.all([
-        matchItems(data.items, data.vendor_name),
+        matchItems(data.items, data.vendor_name, { onRetry }),
         vendors.length ? { vendors } : getVendors(),
       ])
       setMatchedItems(matchResult.items)

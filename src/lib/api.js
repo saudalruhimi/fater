@@ -1,3 +1,5 @@
+import { callGeminiWithRetry } from './gemini'
+
 const API_URL = import.meta.env.DEV ? 'http://localhost:3001/api' : '/api'
 
 async function request(method, path, body = null) {
@@ -11,22 +13,32 @@ async function request(method, path, body = null) {
   }
 
   const res = await fetch(`${API_URL}${path}`, opts)
-  const data = await res.json()
+  let data
+  try { data = await res.json() } catch { data = {} }
 
-  if (!res.ok) throw new Error(data.error || 'حدث خطأ')
+  if (!res.ok) {
+    const err = new Error(data.error || 'حدث خطأ')
+    err.status = res.status
+    // Preserve status code in message so retry wrapper can detect
+    if (res.status === 429 && !err.message.includes('429')) err.message = `429: ${err.message}`
+    if (res.status === 503 && !err.message.includes('503')) err.message = `503: ${err.message}`
+    throw err
+  }
   return data
 }
 
-// Scan
-export function scanInvoice(file) {
-  const formData = new FormData()
-  formData.append('image', file)
-  return request('POST', '/scan', formData)
+// Scan (Gemini-backed) — wrapped with retry
+export function scanInvoice(file, retryOpts = {}) {
+  return callGeminiWithRetry(() => {
+    const formData = new FormData()
+    formData.append('image', file)
+    return request('POST', '/scan', formData)
+  }, retryOpts)
 }
 
-// Match
-export function matchItems(items, vendor_name) {
-  return request('POST', '/match', { items, vendor_name })
+// Match (Gemini-backed for AI fallback) — wrapped with retry
+export function matchItems(items, vendor_name, retryOpts = {}) {
+  return callGeminiWithRetry(() => request('POST', '/match', { items, vendor_name }), retryOpts)
 }
 
 // Push to Qoyod

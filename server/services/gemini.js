@@ -1,5 +1,36 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
+// ============ Retry helper ============
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+async function callWithRetry(fn, { retries = 3, baseDelay = 2000 } = {}) {
+  let lastErr
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn()
+    } catch (e) {
+      lastErr = e
+      const msg = String(e?.message || '')
+      const isRateLimit = msg.includes('429') || msg.includes('Too Many Requests') || msg.includes('Resource exhausted')
+      const isOverloaded = msg.includes('503') || msg.includes('overloaded') || msg.includes('UNAVAILABLE')
+      if (!isRateLimit && !isOverloaded) throw e
+      if (attempt === retries) break
+      const delay = baseDelay * Math.pow(2, attempt) + Math.floor(Math.random() * 500)
+      console.log(`[Gemini retry] attempt ${attempt + 1}/${retries + 1} failed (${isRateLimit ? '429' : '503'}). retrying in ${delay}ms`)
+      await sleep(delay)
+    }
+  }
+  // Re-throw with friendlier message
+  const msg = String(lastErr?.message || '')
+  if (msg.includes('429') || msg.includes('Resource exhausted')) {
+    throw new Error('الذكاء الاصطناعي مشغول حالياً (تجاوز حد الطلبات). انتظر دقيقة وحاول مرة ثانية.')
+  }
+  if (msg.includes('503') || msg.includes('overloaded')) {
+    throw new Error('الذكاء الاصطناعي يواجه حمل عالي حالياً. حاول بعد دقيقة.')
+  }
+  throw lastErr
+}
+
 const SCAN_PROMPT = `أنت نظام متخصص في قراءة الفواتير العربية. حلل صورة الفاتورة هذه واستخرج البيانات التالية بصيغة JSON فقط بدون أي نص إضافي:
 
 {
@@ -51,7 +82,10 @@ export async function scanInvoice(imageBuffer, mimeType) {
     },
   }
 
-  const result = await model.generateContent([SCAN_PROMPT, imagePart])
+  const result = await callWithRetry(
+    () => model.generateContent([SCAN_PROMPT, imagePart]),
+    { retries: 3, baseDelay: 2000 }
+  )
   const text = result.response.text()
 
   // Extract JSON from response (handle markdown code blocks)
@@ -80,7 +114,10 @@ ${productList}
 لو ما فيه تطابق معقول رجع:
 {"product_id": null, "product_name": null, "confidence": 0}`
 
-  const result = await model.generateContent(prompt)
+  const result = await callWithRetry(
+    () => model.generateContent(prompt),
+    { retries: 2, baseDelay: 1000 }
+  )
   const text = result.response.text()
 
   const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/\{[\s\S]*\}/)
