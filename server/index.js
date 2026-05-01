@@ -29,6 +29,23 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// Mobile auth (server-side validation)
+const MOBILE_USERS = [
+  { username: 'saud', password: '114545745Sa&', role: 'ADMIN' },
+  { username: 'users', password: 'Rakan123', role: 'UPLOADER' },
+]
+app.post('/api/mobile/auth', (req, res) => {
+  const { username, password } = req.body || {}
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: 'بيانات ناقصة' })
+  }
+  const u = String(username).trim().toLowerCase()
+  const found = MOBILE_USERS.find((x) => x.username.toLowerCase() === u)
+  if (!found) return res.status(401).json({ success: false, error: 'اسم المستخدم غير موجود' })
+  if (found.password !== password) return res.status(401).json({ success: false, error: 'كلمة المرور غير صحيحة' })
+  res.json({ success: true, user: { username: found.username, role: found.role } })
+})
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
 })

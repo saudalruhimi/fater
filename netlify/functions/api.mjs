@@ -991,4 +991,27 @@ app.get('/api/telegram/status', (req, res) => res.json({ configured: !!BOT_TOKEN
 // Health
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
 
+// ============ Mobile Auth ============
+// Server-side validation against the same user list used in the web app.
+// Returns user info (no token yet — to be replaced by Supabase Auth in next phase).
+const MOBILE_USERS = [
+  { username: 'saud', password: '114545745Sa&', role: 'ADMIN' },
+  { username: 'users', password: 'Rakan123', role: 'UPLOADER' },
+]
+app.post('/api/mobile/auth', (req, res) => {
+  const { username, password } = req.body || {}
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: 'بيانات ناقصة' })
+  }
+  const u = String(username).trim().toLowerCase()
+  const found = MOBILE_USERS.find((x) => x.username.toLowerCase() === u)
+  if (!found) {
+    return res.status(401).json({ success: false, error: 'اسم المستخدم غير موجود' })
+  }
+  if (found.password !== password) {
+    return res.status(401).json({ success: false, error: 'كلمة المرور غير صحيحة' })
+  }
+  res.json({ success: true, user: { username: found.username, role: found.role } })
+})
+
 export const handler = serverless(app)
