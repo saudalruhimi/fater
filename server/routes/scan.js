@@ -18,16 +18,29 @@ router.post('/', upload.single('image'), async (req, res) => {
       return res.status(500).json({ error: 'مفتاح Gemini API غير مُعد' })
     }
 
-    // Compress image if too large (max 4MB for Gemini)
-    let buffer = req.file.buffer
-    let mimeType = req.file.mimetype
-
-    if (mimeType !== 'application/pdf' && buffer.length > 4 * 1024 * 1024) {
-      buffer = await sharp(buffer).resize(2000, 2000, { fit: 'inside' }).jpeg({ quality: 80 }).toBuffer()
-      mimeType = 'image/jpeg'
-    }
+    // Send the original image to Gemini without resizing (resizing degrades small numbers).
+    const buffer = req.file.buffer
+    const mimeType = req.file.mimetype
 
     const data = await scanInvoice(buffer, mimeType)
+
+    // Upload original file to Supabase storage (best-effort — don't fail the scan if storage isn't ready)
+    let imageUrl = null
+    try {
+      const ext = mimeType === 'application/pdf' ? 'pdf' : 'jpg'
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('invoices')
+        .upload(filename, buffer, { contentType: mimeType, upsert: false })
+      if (!upErr) {
+        const { data: pub } = supabase.storage.from('invoices').getPublicUrl(filename)
+        imageUrl = pub?.publicUrl || null
+      } else {
+        console.warn('storage upload failed:', upErr.message)
+      }
+    } catch (e) {
+      console.warn('storage upload exception:', e?.message)
+    }
 
     // Save scanned invoice to Supabase
     const { data: record } = await supabase
@@ -39,12 +52,13 @@ router.post('/', upload.single('image'), async (req, res) => {
         total_amount: data.total_amount,
         vat_amount: data.vat_amount,
         extracted_data: data,
+        image_url: imageUrl,
         status: 'scanned',
       })
       .select()
       .single()
 
-    res.json({ success: true, data, invoice_id: record?.id })
+    res.json({ success: true, data, invoice_id: record?.id, image_url: imageUrl })
   } catch (e) {
     console.error('Scan error:', e)
     const msg = String(e?.message || '')

@@ -1,59 +1,149 @@
 import {
   Upload, FileText, X, Image, Trash2, CheckCircle2, CloudUpload,
   Sparkles, File, Loader2, AlertCircle, Send, ArrowRight, Plus, Pencil, ArrowLeft, Bookmark, Star,
+  Camera, Zap, Target, TrendingUp, AlertTriangle, FileImage,
 } from 'lucide-react'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { scanInvoice, matchItems, pushToQoyod, getInventories, getVendors, getProducts, createMapping, createVendorMapping, getVendorMappings, getNextBillNumber } from '../lib/api.js'
+import { supabase } from '../lib/supabase.js'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import { useToast, parseError } from '../contexts/ToastContext.jsx'
 
 // Mode Selection: AI vs Manual
 function ModeSelect({ onSelect }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 max-w-3xl mx-auto">
-      <button
-        onClick={() => onSelect('ai')}
-        className="group relative bg-white rounded-2xl border-2 border-border-light hover:border-primary p-6 sm:p-8 text-right transition-all card-hover"
-      >
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-primary-50 flex items-center justify-center flex-shrink-0 group-hover:bg-primary group-hover:text-white transition-colors">
-            <Sparkles className="w-6 h-6 text-primary group-hover:text-white" strokeWidth={1.6} />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-base font-bold text-text mb-1.5">عبر الذكاء الاصطناعي</h3>
-            <p className="text-[12px] text-text-muted leading-relaxed">
-              ارفع صورة الفاتورة أو ملف PDF — يقرأ الذكاء الاصطناعي البيانات تلقائياً ويستخرج المورد والبنود والمبالغ.
-            </p>
-            <div className="flex items-center gap-2 mt-3 text-[11px] text-primary font-medium">
-              <span>الأسرع</span>
-              <span className="text-text-muted/40">·</span>
-              <span>للفواتير الإلكترونية</span>
-            </div>
-          </div>
-        </div>
-      </button>
+    <div className="max-w-5xl mx-auto">
+      {/* Hero header */}
+      <div className="text-center mb-8 sm:mb-10">
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-text tracking-tight mb-2">
+          كيف تبي تدخل الفاتورة؟
+        </h2>
+        <p className="text-[13px] sm:text-sm text-text-muted">
+          اختر الطريقة الأنسب لنوع الفاتورة عندك
+        </p>
+      </div>
 
-      <button
-        onClick={() => onSelect('manual')}
-        className="group relative bg-white rounded-2xl border-2 border-border-light hover:border-primary p-6 sm:p-8 text-right transition-all card-hover"
-      >
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-            <Pencil className="w-6 h-6 text-blue-500 group-hover:text-white" strokeWidth={1.6} />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-base font-bold text-text mb-1.5">إدخال يدوي</h3>
-            <p className="text-[12px] text-text-muted leading-relaxed">
-              أدخل بيانات الفاتورة بنفسك — اختر المورد والبنود وأكتب الكميات والأسعار، ثم أرسلها لقيود مباشرة.
+      <div className="grid gap-4 sm:gap-5 sm:grid-cols-2">
+        {/* AI Card */}
+        <button
+          onClick={() => onSelect('ai')}
+          className="group relative overflow-hidden rounded-3xl bg-surface border border-border-light hover:border-primary/40 p-7 sm:p-8 text-right transition-all hover:shadow-[0_8px_24px_rgba(16,185,129,0.12)]"
+        >
+          {/* Decorative gradient glow */}
+          <div className="absolute -top-20 -left-20 w-48 h-48 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.18), transparent 70%)' }} />
+          {/* Dot pattern */}
+          <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{
+            backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
+            backgroundSize: '18px 18px',
+            color: 'var(--color-primary)',
+          }} />
+
+          <div className="relative">
+            {/* Top row: icon + recommended badge */}
+            <div className="flex items-start justify-between mb-5">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary group-hover:border-primary transition-colors">
+                <Sparkles className="w-7 h-7 text-primary group-hover:text-white transition-colors" strokeWidth={1.6} />
+              </div>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10.5px] font-bold text-primary">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                موصى به
+              </span>
+            </div>
+
+            <h3 className="text-xl sm:text-[22px] font-extrabold text-text tracking-tight mb-2">
+              عبر الذكاء الاصطناعي
+            </h3>
+            <p className="text-[13px] text-text-secondary leading-relaxed mb-5">
+              ارفع صورة الفاتورة أو ملف PDF — يقرأ الذكاء الاصطناعي البيانات تلقائياً ويستخرج المورد والبنود والمبالغ خلال ثوانٍ.
             </p>
-            <div className="flex items-center gap-2 mt-3 text-[11px] text-blue-600 font-medium">
-              <span>دقة كاملة</span>
-              <span className="text-text-muted/40">·</span>
-              <span>للفواتير الورقية</span>
+
+            {/* Feature checklist */}
+            <ul className="space-y-2 mb-6">
+              {[
+                'استخراج تلقائي للبيانات بدقة 99%',
+                'دعم رفع متعدد للفواتير دفعة واحدة',
+                'مطابقة ذكية للموردين والبنود',
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2 text-[12.5px] text-text-secondary">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" strokeWidth={2.2} />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+
+            {/* CTA row */}
+            <div className="flex items-center justify-between pt-4 border-t border-border-light">
+              <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
+                <span>للفواتير الإلكترونية</span>
+                <span className="text-text-muted/40">·</span>
+                <span>الأسرع</span>
+              </div>
+              <span className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-primary group-hover:gap-2.5 transition-all">
+                ابدأ
+                <ArrowLeft className="w-4 h-4" strokeWidth={2.4} />
+              </span>
             </div>
           </div>
-        </div>
-      </button>
+        </button>
+
+        {/* Manual Card */}
+        <button
+          onClick={() => onSelect('manual')}
+          className="group relative overflow-hidden rounded-3xl bg-surface border border-border-light hover:border-blue-400/40 p-7 sm:p-8 text-right transition-all hover:shadow-[0_8px_24px_rgba(59,130,246,0.12)]"
+        >
+          <div className="absolute -top-20 -left-20 w-48 h-48 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.16), transparent 70%)' }} />
+          <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{
+            backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
+            backgroundSize: '18px 18px',
+            color: '#3B82F6',
+          }} />
+
+          <div className="relative">
+            <div className="flex items-start justify-between mb-5">
+              <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center group-hover:bg-blue-500 group-hover:border-blue-500 transition-colors">
+                <Pencil className="w-6 h-6 text-blue-500 group-hover:text-white transition-colors" strokeWidth={1.6} />
+              </div>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10.5px] font-bold text-blue-500">
+                دقة 100%
+              </span>
+            </div>
+
+            <h3 className="text-xl sm:text-[22px] font-extrabold text-text tracking-tight mb-2">
+              إدخال يدوي
+            </h3>
+            <p className="text-[13px] text-text-secondary leading-relaxed mb-5">
+              أدخل بيانات الفاتورة بنفسك — اختر المورد والبنود واكتب الكميات والأسعار، ثم أرسلها لقيود مباشرة.
+            </p>
+
+            <ul className="space-y-2 mb-6">
+              {[
+                'تحكم كامل بكل الحقول والأرقام',
+                'قوالب سريعة للفواتير المتكررة',
+                'ترقيم تلقائي لرقم الفاتورة',
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2 text-[12.5px] text-text-secondary">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" strokeWidth={2.2} />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="flex items-center justify-between pt-4 border-t border-border-light">
+              <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
+                <span>للفواتير الورقية</span>
+                <span className="text-text-muted/40">·</span>
+                <span>دقة كاملة</span>
+              </div>
+              <span className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-blue-500 group-hover:gap-2.5 transition-all">
+                ابدأ
+                <ArrowLeft className="w-4 h-4" strokeWidth={2.4} />
+              </span>
+            </div>
+          </div>
+        </button>
+      </div>
     </div>
   )
 }
@@ -64,15 +154,196 @@ function formatSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
+// Compact stat card used in the AI upload hero section (number on top, label below, centered)
+function StatCard({ value, label }) {
+  return (
+    <div className="bg-surface-light border border-border rounded-xl px-4 py-3.5 text-center min-w-[88px]">
+      <div className="text-xl sm:text-[22px] font-extrabold text-text leading-none tracking-tight mb-1 font-mono" dir="ltr">{value}</div>
+      <div className="text-[10.5px] sm:text-[11px] text-text-muted font-medium">{label}</div>
+    </div>
+  )
+}
+
+// Status summary pill — shown at the top of the file queue
+function StatusPill({ icon: Icon, label, count, color, spin }) {
+  if (count === 0) return null
+  return (
+    <div
+      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border bg-surface text-[12px] font-semibold"
+      style={{ borderColor: `color-mix(in srgb, ${color} 30%, transparent)`, color }}
+    >
+      <Icon className={`w-3.5 h-3.5 ${spin ? 'animate-spin' : ''}`} strokeWidth={2} />
+      {label}
+      <span
+        className="font-mono font-bold text-[11px] px-1.5 rounded"
+        style={{ background: `color-mix(in srgb, ${color} 18%, transparent)` }}
+      >
+        {count}
+      </span>
+    </div>
+  )
+}
+
+// Single file card in the queue grid — shows preview, status, and per-status actions
+function FileCard({ file, onRemove, onPreview, onShowError, onRetry, disableRetry }) {
+  const f = file
+  const isProcessing = f.status === 'processing'
+  const isDone = f.status === 'done'
+  const isFailed = f.status === 'failed'
+  const isQueued = f.status === 'queued'
+
+  const accent =
+    isDone ? 'border-primary/40 bg-primary-50/30'
+    : isFailed ? 'border-red-300 bg-red-50/30'
+    : isProcessing ? 'border-blue-300 bg-blue-50/20'
+    : 'border-border-light bg-white'
+
+  const statusLabel =
+    isDone ? 'تم'
+    : isFailed ? 'فشلت'
+    : isProcessing ? 'جارٍ القراءة...'
+    : 'في الانتظار'
+
+  const statusColor =
+    isDone ? '#10B981'
+    : isFailed ? '#EF4444'
+    : isProcessing ? '#3B82F6'
+    : 'var(--color-text-muted)'
+
+  return (
+    <div className={`group rounded-2xl border ${accent} overflow-hidden transition-colors flex flex-col`}>
+      {/* Thumbnail / icon area */}
+      <div
+        className="relative aspect-[4/3] bg-surface-lighter flex items-center justify-center cursor-pointer overflow-hidden"
+        onClick={onPreview}
+      >
+        {f.isImage && f.url ? (
+          <img src={f.url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="flex flex-col items-center gap-1 text-red-400">
+            <File className="w-10 h-10" strokeWidth={1.5} />
+            <span className="text-[10px] font-bold tracking-wider">PDF</span>
+          </div>
+        )}
+
+        {/* Top corner: status badge */}
+        <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-bg/90 backdrop-blur-sm text-[10px] font-bold shadow-sm" style={{ color: statusColor }}>
+          {isDone && <CheckCircle2 className="w-3 h-3" strokeWidth={2.4} />}
+          {isFailed && <AlertCircle className="w-3 h-3" strokeWidth={2.4} />}
+          {isProcessing && <Loader2 className="w-3 h-3 animate-spin" strokeWidth={2.4} />}
+          {statusLabel}
+        </div>
+
+        {/* Top-left: remove button (hidden when processing) */}
+        {!isProcessing && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemove() }}
+            className="absolute top-2 left-2 w-6 h-6 rounded-full bg-bg/90 backdrop-blur-sm text-text-muted hover:text-red-500 hover:bg-red-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+            title="حذف"
+          >
+            <X className="w-3.5 h-3.5" strokeWidth={2.4} />
+          </button>
+        )}
+
+        {/* Processing overlay shimmer */}
+        {isProcessing && (
+          <div className="absolute inset-x-0 bottom-0 h-1 bg-blue-200/60 overflow-hidden">
+            <div
+              className="h-full w-1/3 bg-blue-500"
+              style={{
+                animation: 'fc-slide 1.4s ease-in-out infinite',
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Footer with name + actions */}
+      <div className="p-3 flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-[12.5px] font-semibold text-text truncate" title={f.file.name}>{f.file.name}</p>
+          <p className="text-[10.5px] text-text-muted">{formatSize(f.file.size)}</p>
+        </div>
+
+        {isFailed && (
+          <>
+            <button
+              onClick={onShowError}
+              className="w-7 h-7 rounded-full bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0 transition-colors"
+              title="عرض سبب الفشل"
+            >
+              <AlertCircle className="w-4 h-4" strokeWidth={2.2} />
+            </button>
+            <button
+              onClick={onRetry}
+              disabled={disableRetry}
+              className="w-7 h-7 rounded-full bg-primary-50 hover:bg-primary-100 text-primary-dark flex items-center justify-center flex-shrink-0 transition-colors disabled:opacity-40"
+              title="إعادة المحاولة"
+            >
+              <Sparkles className="w-3.5 h-3.5" strokeWidth={2.2} />
+            </button>
+          </>
+        )}
+
+        {isQueued && (
+          <span className="text-[10.5px] text-text-muted px-2 py-0.5 rounded-full bg-surface-lighter font-medium">
+            في الانتظار
+          </span>
+        )}
+      </div>
+
+      {/* Inline keyframe for shimmer */}
+      <style>{`@keyframes fc-slide { 0% { transform: translateX(-100%); } 50% { transform: translateX(150%); } 100% { transform: translateX(450%); } }`}</style>
+    </div>
+  )
+}
+
 // Step 1: Upload
 function UploadStep({ onScanned }) {
+  // Each file: { id, file, url, isImage, isPdf, status, result, error }
+  // status: 'queued' | 'processing' | 'done' | 'failed'
   const [files, setFiles] = useState([])
   const [dragActive, setDragActive] = useState(false)
   const [preview, setPreview] = useState(null)
+  const [errorDetail, setErrorDetail] = useState(null)
   const [scanning, setScanning] = useState(false)
-  const [error, setError] = useState(null)
+  const [monthCount, setMonthCount] = useState(null)
   const inputRef = useRef(null)
+  const cameraRef = useRef(null)
   const toast = useToast()
+
+  // Fetch the count of invoices scanned this month for the stats card
+  useEffect(() => {
+    const start = new Date()
+    start.setDate(1); start.setHours(0, 0, 0, 0)
+    supabase
+      .from('processed_invoices')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', start.toISOString())
+      .then(({ count }) => { if (typeof count === 'number') setMonthCount(count) })
+  }, [])
+
+  const updateFile = useCallback((id, patch) => {
+    setFiles(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f))
+  }, [])
+
+  const processFile = useCallback(async (f) => {
+    setFiles(prev => prev.map(x => x.id === f.id ? { ...x, status: 'processing', error: null } : x))
+    try {
+      const result = await scanInvoice(f.file, {
+        onRetry: ({ attempt, totalAttempts, delay }) => {
+          toast.warning(
+            `الذكاء الاصطناعي مشغول — محاولة ${attempt}/${totalAttempts} بعد ${(delay / 1000).toFixed(0)}ث`,
+            { title: f.file.name, duration: delay + 500 }
+          )
+        }
+      })
+      setFiles(prev => prev.map(x => x.id === f.id ? { ...x, status: 'done', result: result.data } : x))
+    } catch (e) {
+      const p = parseError(e)
+      setFiles(prev => prev.map(x => x.id === f.id ? { ...x, status: 'failed', error: p.message } : x))
+    }
+  }, [toast])
 
   const addFiles = useCallback((newFiles) => {
     const mapped = Array.from(newFiles)
@@ -83,9 +354,11 @@ function UploadStep({ onScanned }) {
         url: URL.createObjectURL(f),
         isImage: f.type.startsWith('image/'),
         isPdf: f.type === 'application/pdf',
+        status: 'queued',
+        result: null,
+        error: null,
       }))
     setFiles((prev) => [...prev, ...mapped])
-    setError(null)
   }, [])
 
   const removeFile = useCallback((id) => {
@@ -110,127 +383,307 @@ function UploadStep({ onScanned }) {
     if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files)
   }, [addFiles])
 
+  // Process queued/failed files in sequence — failures don't block the rest.
+  // After processing, summarize via toasts using the up-to-date snapshot.
   const startScan = async () => {
-    if (!files.length) return
+    const toProcess = files.filter(f => f.status === 'queued' || f.status === 'failed')
+    if (!toProcess.length) return
     setScanning(true)
-    setError(null)
-    try {
-      const results = []
-      for (const f of files) {
-        const onRetry = ({ attempt, totalAttempts, delay }) => {
-          toast.warning(
-            `الذكاء الاصطناعي مشغول — محاولة ${attempt}/${totalAttempts} بعد ${(delay / 1000).toFixed(0)}ث`,
-            { title: 'جاري إعادة المحاولة', duration: delay + 500 }
-          )
-        }
-        const result = await scanInvoice(f.file, { onRetry })
-        // Attach image preview URL to scanned data
-        results.push({ ...result.data, _previewUrl: f.url || null, _isPdf: f.isPdf || false })
-      }
-      onScanned(results)
-    } catch (e) {
-      const p = parseError(e)
-      toast.error(p.message, { title: p.title || 'فشل قراءة الفاتورة' })
-      setError(e.message)
-    } finally {
-      setScanning(false)
+    for (const f of toProcess) {
+      await processFile(f)
     }
+    setScanning(false)
+    setFiles(prev => {
+      const succeeded = prev.filter(f => f.status === 'done').length
+      const failed = prev.filter(f => f.status === 'failed').length
+      if (succeeded > 0) toast.success(`اكتملت قراءة ${succeeded} فاتورة`, { title: 'نجاح' })
+      if (failed > 0) toast.warning(`${failed} فاتورة فشلت — راجع التفاصيل وأعد المحاولة`, { title: 'تنبيه' })
+      return prev
+    })
+  }
+
+  // Pass only successfully scanned files to the next step
+  const proceedToMatch = () => {
+    const successful = files.filter(f => f.status === 'done' && f.result)
+    if (!successful.length) return
+    const results = successful.map(f => ({ ...f.result, _previewUrl: f.url || null, _isPdf: f.isPdf || false }))
+    onScanned(results)
   }
 
   const hasFiles = files.length > 0
+  const counts = {
+    total: files.length,
+    done: files.filter(f => f.status === 'done').length,
+    processing: files.filter(f => f.status === 'processing').length,
+    failed: files.filter(f => f.status === 'failed').length,
+    queued: files.filter(f => f.status === 'queued').length,
+  }
+  const hasFailed = counts.failed > 0
+  const hasDone = counts.done > 0
+  const hasUnprocessed = counts.queued > 0 || counts.failed > 0
+  const allDone = hasFiles && counts.done === counts.total
 
   return (
     <>
-      <div className={`grid gap-5 ${hasFiles ? 'grid-cols-1 lg:grid-cols-5' : 'grid-cols-1'}`}>
-        <div className={hasFiles ? 'lg:col-span-2' : ''}>
+      {/* Hero strip — gradient background with dot pattern */}
+      {!hasFiles && (
+        <div
+          className="relative overflow-hidden rounded-2xl mb-5 px-5 sm:px-8 py-7 sm:py-8 border border-border-light"
+          style={{ background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-light) 100%)' }}
+        >
+          {/* Dot pattern */}
+          <div className="absolute inset-0 opacity-50 pointer-events-none" style={{
+            backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.10) 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+          }} />
+          {/* Glow */}
+          <div className="absolute inset-0 pointer-events-none" style={{
+            background: 'radial-gradient(ellipse at 80% 50%, rgba(16,185,129,0.12), transparent 60%)',
+          }} />
+
+          <div className="relative flex items-center justify-between gap-6 flex-wrap">
+            <div className="flex-1 min-w-[260px]">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[11.5px] font-bold text-primary mb-3.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                مدعوم بالذكاء الاصطناعي
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-text leading-[1.15] tracking-tight mb-2.5">
+                ارفع فواتيرك للـ <span className="text-primary">AI</span>
+              </h2>
+              <p className="text-[14px] sm:text-[15px] text-text-secondary leading-relaxed max-w-lg">
+                استخرج البيانات تلقائياً من PDF، JPG، أو PNG في ثوانٍ. دقة 99% بدون إدخال يدوي.
+              </p>
+            </div>
+
+            {/* Stats — small horizontal cards */}
+            <div className="flex gap-2.5">
+              <StatCard value={monthCount != null ? monthCount.toLocaleString('en-US') : '—'} label="هذا الشهر" />
+              <StatCard value="99%" label="دقة" />
+              <StatCard value="1.2s" label="متوسط" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Warning banner — inline with right border accent */}
+      {!hasFiles && (
+        <div
+          className="mb-5 flex items-center gap-2.5 rounded-xl px-3.5 py-2.5"
+          style={{
+            background: 'rgba(245,158,11,0.10)',
+            borderRight: '3px solid #F59E0B',
+          }}
+        >
+          <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" strokeWidth={2} />
+          <span className="text-[12.5px] font-bold text-text">تنبيه:</span>
+          <span className="flex-1 text-[12.5px] text-text-secondary">تأكد من اسم المنشأة قبل الإرسال</span>
+          <button
+            onClick={(e) => e.preventDefault()}
+            className="text-[11.5px] font-bold text-amber-500 hover:text-amber-400 px-2 py-1 rounded-md transition-colors whitespace-nowrap"
+          >
+            عرض التفاصيل ←
+          </button>
+        </div>
+      )}
+
+      {/* Stepper pills with chevron separators */}
+      {!hasFiles && (
+        <div className="flex items-center gap-2 mb-5 flex-wrap justify-end">
+          {[
+            { n: 1, label: 'رفع', active: true },
+            { n: 2, label: 'مطابقة', active: false },
+            { n: 3, label: 'إرسال', active: false },
+          ].map((s, i, arr) => (
+            <div key={s.n} className="flex items-center gap-2">
+              {i > 0 && <span className="text-text-muted">›</span>}
+              <div
+                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-[12.5px] font-semibold ${
+                  s.active
+                    ? 'bg-primary/10 border-primary/20 text-primary'
+                    : 'bg-surface border-border-light text-text-secondary'
+                }`}
+              >
+                <span
+                  className={`w-[18px] h-[18px] rounded-full inline-flex items-center justify-center text-[10px] font-bold ${
+                    s.active ? 'bg-primary text-white' : 'bg-surface-lighter text-text-muted'
+                  }`}
+                >
+                  {s.n}
+                </span>
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Hidden file inputs (used by both views) */}
+      <input ref={inputRef} type="file" multiple accept="image/*,.pdf"
+        onChange={(e) => { addFiles(e.target.files); e.target.value = '' }} className="hidden" />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment"
+        onChange={(e) => { addFiles(e.target.files); e.target.value = '' }} className="hidden" />
+
+      {/* Initial big drop zone — only when no files */}
+      {!hasFiles && (
+        <div className="relative rounded-2xl bg-surface border border-border p-5 sm:p-6 overflow-hidden">
           <div
             onDragEnter={handleDrag}
             onDragOver={handleDrag}
             onDragLeave={handleDrag}
             onDrop={handleDrop}
-            onClick={() => !scanning && inputRef.current?.click()}
-            className={`relative rounded-2xl text-center cursor-pointer transition-all ${
-              hasFiles ? 'p-6 sm:p-8' : 'p-10 sm:p-16'
-            } ${dragActive ? 'bg-primary-50 border-2 border-primary' : 'bg-white border-2 border-dashed border-border hover:border-primary/30'}`}
+            className={`relative rounded-xl text-center px-6 py-14 sm:py-16 transition-all border-2 border-dashed ${
+              dragActive ? 'border-primary bg-primary-50/50' : 'border-border'
+            }`}
+            style={!dragActive ? { background: 'radial-gradient(ellipse at center top, rgba(16,185,129,0.10), transparent 65%)' } : undefined}
           >
-            <input ref={inputRef} type="file" multiple accept="image/*,.pdf"
-              onChange={(e) => { addFiles(e.target.files); e.target.value = '' }} className="hidden" />
-            <div className={`mx-auto rounded-full flex items-center justify-center mb-4 ${
-              hasFiles ? 'w-12 h-12' : 'w-16 h-16 sm:w-20 sm:h-20'
-            } ${dragActive ? 'bg-primary/10' : 'bg-surface-lighter'}`}>
-              <CloudUpload className={`${hasFiles ? 'w-6 h-6' : 'w-8 h-8 sm:w-9 sm:h-9'} ${dragActive ? 'text-primary' : 'text-text-muted'}`} strokeWidth={1.4} />
-            </div>
-            <p className={`font-semibold text-text mb-1.5 ${hasFiles ? 'text-sm' : 'text-base sm:text-lg'}`}>
-              {dragActive ? 'أفلت الملفات هنا' : 'اسحب الفواتير وأفلتها'}
-            </p>
-            <p className="text-xs text-text-muted">أو اضغط لاختيار الملفات</p>
-            {!hasFiles && (
-              <div className="flex items-center justify-center gap-4 sm:gap-6 pt-4">
-                <div className="flex items-center gap-1.5 text-text-muted"><Image className="w-3.5 h-3.5" /><span className="text-[11px]">PNG / JPG</span></div>
-                <div className="flex items-center gap-1.5 text-text-muted"><FileText className="w-3.5 h-3.5" /><span className="text-[11px]">PDF</span></div>
-                <div className="text-[11px] text-text-muted/60">حد 10MB</div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {hasFiles && (
-          <div className="lg:col-span-3 flex flex-col">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary-50 flex items-center justify-center">
-                  <span className="text-[11px] font-bold text-primary">{files.length}</span>
-                </div>
-                <span className="text-sm font-semibold text-text">ملفات جاهزة</span>
-              </div>
-              <button onClick={() => { files.forEach(f => f.url && URL.revokeObjectURL(f.url)); setFiles([]); }}
-                className="text-[11px] text-text-muted hover:text-red-500 transition-colors px-2 py-1 rounded-md hover:bg-red-50">مسح الكل</button>
-            </div>
-
-            <div className="flex-1 space-y-2 overflow-y-auto max-h-[50vh] pl-1">
-              {files.map((f) => (
-                <div key={f.id} className="bg-white rounded-xl border border-border-light hover:border-primary/20 transition-all group">
-                  <div className="flex items-center gap-3 p-3">
-                    <div className={`w-14 h-14 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center ${f.isImage && f.url ? '' : 'bg-surface-lighter'}`}
-                      onClick={() => f.isImage && setPreview(f)}>
-                      {f.isImage && f.url
-                        ? <img src={f.url} alt="" className="w-full h-full object-cover rounded-lg" />
-                        : <div className="flex flex-col items-center gap-0.5"><File className="w-5 h-5 text-red-400" /><span className="text-[8px] font-bold text-red-400">PDF</span></div>
-                      }
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-text truncate">{f.file.name}</p>
-                      <span className="text-[11px] text-text-muted">{formatSize(f.file.size)}</span>
-                    </div>
-                    <button onClick={() => removeFile(f.id)} className="p-2 rounded-lg hover:bg-red-50 text-text-muted hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+            {/* Stack of 3 rotated file cards */}
+            <div className="relative mx-auto mb-5" style={{ width: 96, height: 80 }}>
+              {[
+                { rot: -12, top: 4, left: 0, opacity: 0.5, color: 'var(--color-text-muted)' },
+                { rot: 6, top: 0, left: 18, opacity: 0.85, color: '#F59E0B' },
+                { rot: -3, top: 8, left: 36, opacity: 1, color: 'var(--color-primary)' },
+              ].map((c, i) => (
+                <div
+                  key={i}
+                  className="absolute rounded-[9px] bg-surface-light flex items-center justify-center"
+                  style={{
+                    top: c.top, left: c.left,
+                    width: 54, height: 70,
+                    border: `1.5px solid ${c.color}`,
+                    transform: `rotate(${c.rot}deg)`,
+                    opacity: c.opacity,
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+                  }}
+                >
+                  <FileText className="w-5 h-5" style={{ color: c.color }} strokeWidth={2} />
                 </div>
               ))}
             </div>
 
-            {error && (
-              <div className="mt-3 flex items-center gap-2 text-red-600 bg-red-50 rounded-xl px-4 py-3 text-[13px]">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                {error}
-              </div>
-            )}
+            <h3 className="text-xl sm:text-[22px] font-extrabold text-text leading-tight mb-1.5 tracking-tight">
+              {dragActive ? 'أفلت الملفات هنا' : 'اسحب أو اضغط لرفع الفواتير'}
+            </h3>
+            <p className="text-[13px] text-text-muted mb-5">
+              رفع متعدد · حد أقصى 10MB · PDF / JPG / PNG
+            </p>
 
-            <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-3 border-t border-border-light">
-              <button onClick={() => inputRef.current?.click()} disabled={scanning}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-border text-text-secondary text-[13px] font-medium hover:border-primary/40 disabled:opacity-50">
-                <Upload className="w-4 h-4" /> إضافة المزيد
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5">
+              <button
+                onClick={() => inputRef.current?.click()}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary hover:bg-primary-dark text-white text-[13.5px] font-bold transition-colors"
+                style={{ boxShadow: '0 6px 16px rgba(16,185,129,0.30)' }}
+              >
+                <Upload className="w-4 h-4" strokeWidth={2.4} />
+                رفع من الجهاز
               </button>
-              <button onClick={startScan} disabled={scanning}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-[13px] py-2.5 px-6 rounded-xl transition-colors disabled:opacity-70">
-                {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {scanning ? 'جارِ القراءة...' : 'ابدأ القراءة'}
+              <button
+                onClick={() => cameraRef.current?.click()}
+                className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-surface-light border border-border text-text text-[13.5px] font-semibold hover:border-primary/40 transition-colors"
+              >
+                <Camera className="w-4 h-4" strokeWidth={1.8} />
+                من الكاميرا
               </button>
             </div>
           </div>
-        )}
-      </div>
+
+          <div className="flex items-center justify-center mt-4 pt-4 border-t border-border-light text-[12px]">
+            <span className="text-text-muted">💡 نصيحة: للحصول على أفضل دقة، تأكد من وضوح الصورة</span>
+          </div>
+        </div>
+      )}
+
+      {/* Queue / processing view — when files exist */}
+      {hasFiles && (
+        <div>
+          {/* Header bar */}
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-text">قائمة الفواتير</h2>
+              <p className="text-[12px] text-text-muted mt-0.5">
+                {counts.total} فاتورة بالقائمة · {formatSize(files.reduce((s, f) => s + f.file.size, 0))}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => inputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface border border-border-light text-text-secondary text-[12.5px] font-semibold hover:border-primary/40 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" strokeWidth={2.4} />
+                إضافة
+              </button>
+              <button
+                onClick={() => { files.forEach(f => f.url && URL.revokeObjectURL(f.url)); setFiles([]) }}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50/40 text-[12.5px] font-medium transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} />
+                مسح الكل
+              </button>
+            </div>
+          </div>
+
+          {/* Status pills + overall progress */}
+          <div className="flex items-center flex-wrap gap-2 mb-5">
+            <StatusPill icon={CheckCircle2} label="تم" count={counts.done} color="#10B981" />
+            <StatusPill icon={Loader2} label="جاري" count={counts.processing} color="#3B82F6" spin />
+            <StatusPill icon={AlertCircle} label="فشلت" count={counts.failed} color="#EF4444" />
+            <StatusPill icon={File} label="في الانتظار" count={counts.queued} color="var(--color-text-muted)" />
+            {scanning && (
+              <div className="flex-1 min-w-[140px] flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-surface-lighter rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{ width: `${counts.total ? Math.round((counts.done / counts.total) * 100) : 0}%` }}
+                  />
+                </div>
+                <span className="text-[11px] font-mono text-text-muted whitespace-nowrap" dir="ltr">
+                  {counts.done} / {counts.total}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Grid of file cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-6">
+            {files.map((f) => (
+              <FileCard
+                key={f.id}
+                file={f}
+                onRemove={() => removeFile(f.id)}
+                onPreview={() => f.isImage && setPreview(f)}
+                onShowError={() => setErrorDetail(f)}
+                onRetry={() => processFile(f)}
+                disableRetry={scanning}
+              />
+            ))}
+          </div>
+
+          {/* Sticky bottom action bar */}
+          <div className="sticky bottom-0 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-bg/95 backdrop-blur-sm border-t border-border-light">
+            <div className="flex items-center flex-wrap justify-end gap-2">
+              {hasUnprocessed && (
+                <button
+                  onClick={startScan}
+                  disabled={scanning}
+                  className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold text-[13px] py-2.5 px-5 rounded-xl transition-colors disabled:opacity-70"
+                >
+                  {scanning
+                    ? <><Loader2 className="w-4 h-4 animate-spin" />جارِ القراءة...</>
+                    : <><Sparkles className="w-4 h-4" />{hasFailed && !counts.queued ? `إعادة محاولة الفاشلة (${counts.failed})` : `ابدأ القراءة (${counts.queued + counts.failed})`}</>}
+                </button>
+              )}
+              {hasDone && !scanning && (
+                <button
+                  onClick={proceedToMatch}
+                  className="inline-flex items-center justify-center gap-2 bg-primary-dark hover:bg-primary text-white font-bold text-[13px] py-2.5 px-5 rounded-xl transition-colors"
+                >
+                  متابعة بالناجحة ({counts.done})
+                  <ArrowLeft className="w-4 h-4" strokeWidth={2.2} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {preview && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setPreview(null)}>
@@ -241,6 +694,46 @@ function UploadStep({ onScanned }) {
             </div>
             <div className="flex-1 overflow-auto p-4 bg-surface-light flex items-center justify-center">
               <img src={preview.url} alt="" className="max-w-full max-h-[75vh] object-contain rounded-xl" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {errorDetail && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setErrorDetail(null)}>
+          <div className="bg-white rounded-2xl overflow-hidden max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-border-light flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-4.5 h-4.5 text-red-500" strokeWidth={2} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-text">فشلت قراءة الفاتورة</p>
+                <p className="text-[11px] text-text-muted truncate">{errorDetail.file.name}</p>
+              </div>
+              <button onClick={() => setErrorDetail(null)} className="p-1.5 rounded-lg hover:bg-surface-lighter">
+                <X className="w-4 h-4 text-text-muted" />
+              </button>
+            </div>
+            <div className="p-5">
+              <p className="text-[13px] text-text-secondary leading-loose mb-4">
+                {errorDetail.error || 'حدث خطأ غير معروف أثناء معالجة هذه الفاتورة.'}
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setErrorDetail(null)}
+                  className="px-4 py-2 rounded-lg text-text-secondary text-[13px] font-medium hover:bg-surface-lighter transition-colors"
+                >
+                  إغلاق
+                </button>
+                <button
+                  onClick={() => { const f = errorDetail; setErrorDetail(null); processFile(f) }}
+                  disabled={scanning}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-[13px] font-bold transition-colors disabled:opacity-60"
+                >
+                  <Sparkles className="w-3.5 h-3.5" strokeWidth={2.2} />
+                  إعادة المحاولة
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -283,9 +776,16 @@ function bumpInvoiceCounter() {
 }
 
 // Step 2: Review & Match (also used for Manual mode)
-function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBack, isManual = false }) {
-  const [items, setItems] = useState(data.items || [])
+function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBack, isManual = false, onDraftChange, navigation, onMarkReady, onSendAll, status, sendingAll }) {
+  const [items, setItems] = useState(() => (data.items || []).map(it => ({
+    ...it,
+    discount: Number(it.discount) || 0,
+    discount_type: it.discount_type || 'amount',
+    line_subtotal_incl_vat: Number(it.line_subtotal_incl_vat) || 0,
+  })))
   const [vendorId, setVendorId] = useState(() => {
+    // Prefer an already-saved vendor_id (when navigating back to a draft)
+    if (data.vendor_id) return data.vendor_id
     if (!data.vendor_name || !vendors.length) return null
     const activeVendors = vendors.filter(v => (v.status || 'Active') === 'Active')
 
@@ -379,7 +879,7 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
   }
 
   const addItem = () => {
-    setItems(prev => [...prev, { description: '', quantity: 1, unit_price: 0, matched_product_id: null, matched_product_name: null, match_type: 'unmatched' }])
+    setItems(prev => [...prev, { description: '', quantity: 1, unit_price: 0, discount: 0, discount_type: 'amount', line_subtotal_incl_vat: 0, matched_product_id: null, matched_product_name: null, match_type: 'unmatched' }])
   }
 
   const removeItem = (idx) => {
@@ -387,8 +887,49 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
   }
 
   const calcLineTotal = (item) => {
-    return item.total || (item.quantity * item.unit_price)
+    const qty = Number(item.quantity) || 0
+    const unit = Number(item.unit_price) || 0
+    const disc = Number(item.discount) || 0
+    const type = item.discount_type || 'amount'
+    const gross = qty * unit
+    return type === 'percent' ? gross * (1 - disc / 100) : gross - disc
   }
+
+  // Excl-VAT line total derived from the printed "Item Subtotal (Including VAT)"
+  const printedLineExcl = (item, vatRate = 15) => {
+    const incl = Number(item.line_subtotal_incl_vat) || 0
+    if (!incl) return null
+    return incl / (1 + vatRate / 100)
+  }
+
+  // Adjust unit_price so the calculated line total exactly matches the printed value
+  const completeHalalas = (idx) => {
+    setItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item
+      const target = printedLineExcl(item, data.vat_rate || 15)
+      if (target == null) return item
+      const qty = Number(item.quantity) || 0
+      const disc = Number(item.discount) || 0
+      const type = item.discount_type || 'amount'
+      if (qty <= 0) return item
+      let newUnit
+      if (type === 'percent') {
+        const denom = qty * (1 - disc / 100)
+        if (denom <= 0) return item
+        newUnit = target / denom
+      } else {
+        newUnit = (target + disc) / qty
+      }
+      return { ...item, unit_price: Math.round(newUnit * 10000) / 10000 }
+    }))
+  }
+
+  // Sync the current draft up to the parent so navigation preserves edits
+  useEffect(() => {
+    if (!onDraftChange) return
+    onDraftChange({ vendorId, invoiceNum, invoiceDate, dueDate, items })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendorId, invoiceNum, invoiceDate, dueDate, items])
 
   const selectedVendor = vendors.find(v => v.id === vendorId)
 
@@ -680,18 +1221,62 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
                     }}
                     className="w-24 bg-surface-light border border-border-light rounded-lg py-1 px-2 text-center text-text focus:outline-none" dir="ltr" />
                 </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-text-muted text-[11px]">خصم:</span>
+                  <div className="flex items-center bg-surface-light border border-border-light rounded-lg overflow-hidden">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={item.discount ?? ''}
+                      onChange={e => {
+                        const v = e.target.value.replace(',', '.')
+                        if (v === '' || /^\d*\.?\d*$/.test(v)) {
+                          updateItem(idx, 'discount', v === '' || v === '.' ? '' : v)
+                        }
+                      }}
+                      onBlur={e => {
+                        const n = parseFloat(e.target.value)
+                        updateItem(idx, 'discount', isNaN(n) ? 0 : n)
+                      }}
+                      className="w-20 bg-transparent py-1 px-2 text-center text-text focus:outline-none" dir="ltr" />
+                    <select
+                      value={item.discount_type || 'amount'}
+                      onChange={e => updateItem(idx, 'discount_type', e.target.value)}
+                      className="bg-white border-r border-border-light py-1 px-1.5 text-[11px] text-text-muted focus:outline-none cursor-pointer"
+                    >
+                      <option value="amount">ر</option>
+                      <option value="percent">%</option>
+                    </select>
+                  </div>
+                </div>
                 <span className="text-text-muted text-[11px]">الإجمالي:</span>
                 <span className="font-semibold text-text">{calcLineTotal(item).toFixed(2)} ر.س</span>
+                {(() => {
+                  const target = printedLineExcl(item, data.vat_rate || 15)
+                  if (target == null) return null
+                  const diff = target - calcLineTotal(item)
+                  if (Math.abs(diff) < 0.01) return null
+                  return (
+                    <button
+                      onClick={() => completeHalalas(idx)}
+                      title={`المعروض شامل الضريبة بالفاتورة: ${(target * (1 + (data.vat_rate || 15) / 100)).toFixed(2)} ر.س — اضغط لمطابقة الإجمالي بدقة`}
+                      className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors whitespace-nowrap"
+                    >
+                      خصم الهللات ({diff > 0 ? '+' : ''}{diff.toFixed(2)})
+                    </button>
+                  )
+                })()}
               </div>
             </div>
           ))}
         </div>
 
-        {/* Totals */}
+        {/* Totals — always computed from current items so edits update live */}
         {items.length > 0 && (() => {
+          const vatRate = data.vat_rate || 15
           const subtotal = items.reduce((s, i) => s + calcLineTotal(i), 0)
-          const vatAmount = isManual ? subtotal * 0.15 : (data.vat_amount || subtotal * 0.15)
-          const totalAmount = isManual ? (subtotal + vatAmount) : (data.total_amount || (subtotal + vatAmount))
+          const vatAmount = subtotal * (vatRate / 100)
+          const totalAmount = subtotal + vatAmount
           return (
             <div className="border-t border-border-light">
               <div className="px-5 py-2 flex items-center justify-between">
@@ -717,18 +1302,90 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <button onClick={onBack} disabled={saving}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-border text-text-secondary text-[13px] font-medium hover:bg-surface-lighter disabled:opacity-50">
-          رجوع
-        </button>
-        <button onClick={handlePush} disabled={saving}
-          className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-[13px] py-2.5 px-6 rounded-xl transition-colors disabled:opacity-70">
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          {saving ? 'جارِ الإرسال...' : 'أرسل لقيود'}
-        </button>
-      </div>
+      {/* Sticky bottom action bar — different for batch (multi-invoice) vs single */}
+      {navigation ? (
+        <div className="sticky bottom-0 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-bg/95 backdrop-blur-sm border-t border-border-light">
+          <div className="flex items-center flex-wrap gap-3 justify-between">
+            {/* Prev / index / Next */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={navigation.goPrev}
+                disabled={!navigation.hasPrev || sendingAll}
+                className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-surface border border-border-light text-text-secondary text-[12.5px] font-semibold hover:border-primary/40 disabled:opacity-40 transition-colors"
+              >
+                <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.2} />
+                السابقة
+              </button>
+              <span className="text-[12px] font-mono text-text-muted px-2" dir="ltr">
+                {navigation.idx + 1} / {navigation.total}
+              </span>
+              <button
+                onClick={navigation.goNext}
+                disabled={!navigation.hasNext || sendingAll}
+                className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-surface border border-border-light text-text-secondary text-[12.5px] font-semibold hover:border-primary/40 disabled:opacity-40 transition-colors"
+              >
+                التالية
+                <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.2} />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Mark ready / unready */}
+              {status !== 'sent' && (
+                <button
+                  onClick={() => onMarkReady && onMarkReady(status === 'ready' ? 'pending' : 'ready')}
+                  disabled={sendingAll}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12.5px] font-semibold transition-colors disabled:opacity-50 ${
+                    status === 'ready'
+                      ? 'bg-primary-50 border border-primary/30 text-primary-dark'
+                      : 'bg-surface border border-border-light text-text-secondary hover:border-primary/40'
+                  }`}
+                >
+                  {status === 'ready'
+                    ? <><CheckCircle2 className="w-4 h-4" strokeWidth={2.2} />جاهزة للإرسال</>
+                    : <>تجهيز للإرسال</>}
+                </button>
+              )}
+              {status === 'sent' && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white text-[12.5px] font-bold">
+                  <CheckCircle2 className="w-4 h-4" strokeWidth={2.4} />تم الإرسال
+                </span>
+              )}
+              {status === 'failed' && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-50 text-red-600 text-[12.5px] font-bold">
+                  <AlertCircle className="w-4 h-4" strokeWidth={2.2} />فشل الإرسال
+                </span>
+              )}
+
+              {/* Send all (batch) */}
+              {onSendAll && (
+                <button
+                  onClick={onSendAll}
+                  disabled={sendingAll || navigation.readyCount === 0}
+                  className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold text-[13px] py-2 px-5 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {sendingAll
+                    ? <><Loader2 className="w-4 h-4 animate-spin" />جارِ الإرسال...</>
+                    : <><Send className="w-4 h-4" strokeWidth={2.2} />إرسال الجاهزة ({navigation.readyCount})</>}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        // Single-invoice mode (manual entry) — original send button
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <button onClick={onBack} disabled={saving}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-border text-text-secondary text-[13px] font-medium hover:bg-surface-lighter disabled:opacity-50">
+            رجوع
+          </button>
+          <button onClick={handlePush} disabled={saving}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-[13px] py-2.5 px-6 rounded-xl transition-colors disabled:opacity-70">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            {saving ? 'جارِ الإرسال...' : 'أرسل لقيود'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -756,8 +1413,12 @@ function SuccessStep({ count, onReset }) {
 export default function UploadInvoice() {
   const [mode, setMode] = useState(null) // null | 'ai' | 'manual'
   const [step, setStep] = useState('upload') // upload | match | success
-  const [allScanned, setAllScanned] = useState([]) // array of scanned invoices
+  // invoiceStates: per-invoice persistent editing state
+  // each: { data, matchedItems, draft, status, error }
+  // status: 'pending' | 'ready' | 'sent' | 'failed'
+  const [invoiceStates, setInvoiceStates] = useState([])
   const [currentIdx, setCurrentIdx] = useState(0)
+  // Manual mode keeps a single scannedData/matchedItems (no batch)
   const [scannedData, setScannedData] = useState(null)
   const [matchedItems, setMatchedItems] = useState(null)
   const [products, setProducts] = useState([])
@@ -765,6 +1426,7 @@ export default function UploadInvoice() {
   const [vendorMappings, setVendorMappings] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [sendingAll, setSendingAll] = useState(false)
   const [doneCount, setDoneCount] = useState(0)
   const toast = useToast()
 
@@ -803,8 +1465,11 @@ export default function UploadInvoice() {
     }
   }
 
-  const loadInvoice = async (data) => {
-    setScannedData(data)
+  // Match items for a single invoice and cache the result on its state slot
+  const loadMatchForIdx = async (idx, source) => {
+    const list = source || invoiceStates
+    const slot = list[idx]
+    if (!slot || slot.matchedItems) return
     setLoading(true)
     setError(null)
     try {
@@ -815,31 +1480,80 @@ export default function UploadInvoice() {
         )
       }
       const [matchResult, vendorsResult, vmResult] = await Promise.all([
-        matchItems(data.items, data.vendor_name, { onRetry }),
+        matchItems(slot.data.items, slot.data.vendor_name, { onRetry }),
         vendors.length ? { vendors } : getVendors(),
         vendorMappings.length ? { mappings: vendorMappings } : getVendorMappings().catch(() => ({ mappings: [] })),
       ])
-      setMatchedItems(matchResult.items)
       setProducts(matchResult.products)
       if (!vendors.length) setVendors(vendorsResult.vendors || [])
       if (!vendorMappings.length) setVendorMappings(vmResult?.mappings || [])
-      setStep('match')
+      setInvoiceStates(prev => prev.map((s, i) => i === idx ? { ...s, matchedItems: matchResult.items } : s))
     } catch (e) {
       const p = parseError(e)
       toast.error(p.message, { title: p.title })
+      setError(p.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleScanned = async (results) => {
-    setAllScanned(results)
-    setCurrentIdx(0)
-    setDoneCount(0)
-    await loadInvoice(results[0])
+  // Manual mode loader (single invoice, no batch state)
+  const loadManualInvoice = async (data) => {
+    setScannedData(data)
+    setMatchedItems(data.items || [])
+    setStep('match')
   }
 
-  const handlePush = async ({ vendorId, vendor, invoiceNum, invoiceDate, dueDate, items, isInclusive, originalVendorName }) => {
+  const handleScanned = async (results) => {
+    const states = results.map(data => ({
+      data,
+      matchedItems: null,
+      draft: null,
+      status: 'pending',
+      error: null,
+    }))
+    setInvoiceStates(states)
+    setCurrentIdx(0)
+    setDoneCount(0)
+    setStep('match')
+    await loadMatchForIdx(0, states)
+  }
+
+  const goToInvoice = async (idx) => {
+    if (idx < 0 || idx >= invoiceStates.length) return
+    setCurrentIdx(idx)
+    if (!invoiceStates[idx].matchedItems) {
+      await loadMatchForIdx(idx)
+    }
+  }
+
+  const updateDraft = useCallback((idx, draft) => {
+    setInvoiceStates(prev => prev.map((s, i) => i === idx ? { ...s, draft } : s))
+  }, [])
+
+  const setInvoiceStatus = useCallback((idx, status, error = null) => {
+    setInvoiceStates(prev => prev.map((s, i) => i === idx ? { ...s, status, error } : s))
+  }, [])
+
+  // Build the data object that MatchStep will consume — applies any saved draft on top
+  const getMatchStepData = (idx) => {
+    const s = invoiceStates[idx]
+    if (!s) return null
+    if (s.draft) {
+      return {
+        ...s.data,
+        vendor_id: s.draft.vendorId,
+        invoice_number: s.draft.invoiceNum,
+        invoice_date: s.draft.invoiceDate,
+        due_date: s.draft.dueDate,
+        items: s.draft.items,
+      }
+    }
+    return { ...s.data, items: s.matchedItems || s.data.items || [] }
+  }
+
+  // Single-invoice push (used by manual mode and as the inner worker for sendAll)
+  const sendInvoiceToQoyod = async ({ vendorId, vendor, invoiceNum, invoiceDate, dueDate, items, isInclusive, originalVendorName }) => {
     // Save vendor mapping if invoice vendor name differs from chosen Qoyod vendor name
     if (originalVendorName && originalVendorName.trim() && originalVendorName.trim() !== vendor) {
       try {
@@ -848,7 +1562,7 @@ export default function UploadInvoice() {
           qoyod_vendor_id: vendorId,
           qoyod_vendor_name: vendor,
         })
-      } catch { /* ignore — table may not exist yet */ }
+      } catch { /* ignore */ }
     }
 
     // Save new manual item mappings
@@ -885,28 +1599,63 @@ export default function UploadInvoice() {
         description: i.description,
         quantity: i.quantity,
         unit_price: i.unit_price,
+        discount: i.discount || 0,
+        discount_type: i.discount_type || 'amount',
+        line_subtotal_incl_vat: i.line_subtotal_incl_vat || 0,
         tax_percent: 15,
       })),
     })
 
-    // Bump invoice counter for manual mode
     if (mode === 'manual' && /^BILL\d+$/.test(invoiceNum)) {
       bumpInvoiceCounter()
     }
+  }
 
-    toast.success(`تم تسجيل الفاتورة ${invoiceNum || ''} في قيود`, { title: 'تمت العملية بنجاح' })
+  // Manual-mode push (single invoice, immediate send + advance to success)
+  const handleManualPush = async (payload) => {
+    await sendInvoiceToQoyod(payload)
+    toast.success(`تم تسجيل الفاتورة ${payload.invoiceNum || ''} في قيود`, { title: 'تمت العملية بنجاح' })
+    setDoneCount(doneCount + 1)
+    setStep('success')
+  }
 
-    const newDone = doneCount + 1
-    setDoneCount(newDone)
-
-    // If more invoices, load next
-    const nextIdx = currentIdx + 1
-    if (nextIdx < allScanned.length) {
-      setCurrentIdx(nextIdx)
-      await loadInvoice(allScanned[nextIdx])
-    } else {
-      setStep('success')
+  // Bulk send all 'ready' invoices
+  const sendAll = async () => {
+    const ready = invoiceStates
+      .map((s, idx) => ({ s, idx }))
+      .filter(({ s }) => s.status === 'ready' && s.draft)
+    if (!ready.length) {
+      toast.warning('لا توجد فواتير جاهزة للإرسال', { title: 'لا يوجد ما يُرسل' })
+      return
     }
+    setSendingAll(true)
+    let succeeded = 0
+    let failed = 0
+    for (const { s, idx } of ready) {
+      try {
+        const v = vendors.find(x => x.id === s.draft.vendorId)
+        await sendInvoiceToQoyod({
+          vendorId: s.draft.vendorId,
+          vendor: v?.name || '',
+          invoiceNum: s.draft.invoiceNum,
+          invoiceDate: s.draft.invoiceDate,
+          dueDate: s.draft.dueDate,
+          items: s.draft.items,
+          isInclusive: s.data.is_inclusive ?? false,
+          originalVendorName: s.data.vendor_name || '',
+        })
+        setInvoiceStatus(idx, 'sent')
+        succeeded++
+      } catch (e) {
+        const p = parseError(e)
+        setInvoiceStatus(idx, 'failed', p.message)
+        failed++
+      }
+    }
+    setSendingAll(false)
+    setDoneCount(prev => prev + succeeded)
+    if (succeeded > 0) toast.success(`تم إرسال ${succeeded} فاتورة لقيود`, { title: 'تمت العملية' })
+    if (failed > 0) toast.warning(`${failed} فاتورة فشل إرسالها — راجع التفاصيل`, { title: 'فشل جزئي' })
   }
 
   const reset = () => {
@@ -914,40 +1663,55 @@ export default function UploadInvoice() {
     setStep('upload')
     setScannedData(null)
     setMatchedItems(null)
-    setAllScanned([])
+    setInvoiceStates([])
     setCurrentIdx(0)
     setDoneCount(0)
     setProducts([])
     setError(null)
   }
 
-  return (
-    <div className="max-w-5xl animate-page">
-      <div className="mb-6 sm:mb-8">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1">
-            <h1 className="text-lg sm:text-xl font-bold text-text">رفع الفواتير</h1>
-            <p className="text-xs sm:text-sm text-text-muted mt-1">
-              {mode === null && 'اختر طريقة إدخال الفاتورة'}
-              {mode === 'ai' && step === 'upload' && 'ارفع صورة الفاتورة لقراءتها بالذكاء الاصطناعي'}
-              {step === 'match' && (allScanned.length > 1
-                ? `فاتورة ${currentIdx + 1} من ${allScanned.length} — راجع البيانات وطابق البنود`
-                : mode === 'manual' ? 'أدخل بيانات الفاتورة يدوياً' : 'راجع البيانات المستخرجة وطابق البنود')}
-              {step === 'success' && 'تمت العملية بنجاح'}
-            </p>
-          </div>
-          {mode && step !== 'success' && (
-            <button onClick={reset}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-text-muted hover:text-primary-dark hover:bg-primary-50 transition-colors flex-shrink-0">
-              <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2} />
-              <span className="hidden sm:inline">اختر نمط آخر</span>
-              <span className="sm:hidden">رجوع</span>
-            </button>
-          )}
-        </div>
+  // The AI upload step has its own hero design — hide the generic page header for it
+  const isAiUploadHero = mode === 'ai' && step === 'upload'
 
-        {/* Steps indicator (hide on mode select) */}
-        {mode && step !== 'success' && (
+  return (
+    <div className="w-full animate-page">
+      <div className="mb-6 sm:mb-8">
+        {!isAiUploadHero && (
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <h1 className="text-lg sm:text-xl font-bold text-text">رفع الفواتير</h1>
+              <p className="text-xs sm:text-sm text-text-muted mt-1">
+                {mode === null && 'اختر طريقة إدخال الفاتورة'}
+                {step === 'match' && (invoiceStates.length > 0
+                  ? `فاتورة ${currentIdx + 1} من ${invoiceStates.length} — جهّز كل الفواتير ثم أرسلها دفعة واحدة`
+                  : mode === 'manual' ? 'أدخل بيانات الفاتورة يدوياً' : 'راجع البيانات المستخرجة وطابق البنود')}
+                {step === 'success' && 'تمت العملية بنجاح'}
+              </p>
+            </div>
+            {mode && step !== 'success' && (
+              <button onClick={reset}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-text-muted hover:text-primary-dark hover:bg-primary-50 transition-colors flex-shrink-0">
+                <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2} />
+                <span className="hidden sm:inline">اختر نمط آخر</span>
+                <span className="sm:hidden">رجوع</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* "Choose another mode" link only — for AI upload hero */}
+        {isAiUploadHero && (
+          <div className="flex justify-end mb-4">
+            <button onClick={reset}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-text-muted hover:text-primary-dark hover:bg-primary-50 transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2} />
+              اختر نمط آخر
+            </button>
+          </div>
+        )}
+
+        {/* Steps indicator (hide on mode select and on hero — hero shows it differently) */}
+        {mode && step !== 'success' && !isAiUploadHero && (
           <div className="flex items-center gap-2 mt-4">
             {(mode === 'ai' ? ['رفع', 'مطابقة', 'إرسال'] : ['الإدخال', 'الإرسال']).map((s, i) => {
               const stepIdx = mode === 'ai' ? (step === 'upload' ? 0 : 1) : 0
@@ -983,17 +1747,79 @@ export default function UploadInvoice() {
         <ModeSelect onSelect={(m) => m === 'ai' ? setMode('ai') : startManualMode()} />
       )}
       {!loading && mode === 'ai' && step === 'upload' && <UploadStep onScanned={handleScanned} />}
-      {!loading && step === 'match' && (
+
+      {/* AI batch — multi-invoice flow with persistent state, navigation, and bulk send */}
+      {!loading && step === 'match' && mode === 'ai' && invoiceStates.length > 0 && (
+        <>
+          {/* Invoice strip — quick navigation between invoices with status indicators */}
+          {invoiceStates.length > 1 && (
+            <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-1">
+              {invoiceStates.map((s, i) => {
+                const active = i === currentIdx
+                const colorMap = {
+                  pending: { bg: 'bg-surface', border: 'border-border-light', text: 'text-text-secondary', dot: 'bg-text-muted/40' },
+                  ready: { bg: 'bg-primary-50', border: 'border-primary/30', text: 'text-primary-dark', dot: 'bg-primary' },
+                  sent: { bg: 'bg-primary', border: 'border-primary', text: 'text-white', dot: 'bg-white' },
+                  failed: { bg: 'bg-red-50', border: 'border-red-300', text: 'text-red-600', dot: 'bg-red-500' },
+                }
+                const c = colorMap[s.status] || colorMap.pending
+                return (
+                  <button
+                    key={i}
+                    onClick={() => goToInvoice(i)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[12px] font-semibold whitespace-nowrap transition-all ${c.bg} ${c.text} ${
+                      active ? `${c.border} ring-2 ring-primary/30` : c.border
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+                    فاتورة {i + 1}
+                    {s.status === 'sent' && <CheckCircle2 className="w-3 h-3" strokeWidth={2.4} />}
+                    {s.status === 'failed' && <AlertCircle className="w-3 h-3" strokeWidth={2.4} />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          <MatchStep
+            key={currentIdx}
+            data={getMatchStepData(currentIdx)}
+            products={products}
+            vendors={vendors}
+            vendorMappings={vendorMappings}
+            onBack={reset}
+            isManual={false}
+            onDraftChange={(d) => updateDraft(currentIdx, d)}
+            navigation={{
+              idx: currentIdx,
+              total: invoiceStates.length,
+              hasPrev: currentIdx > 0,
+              hasNext: currentIdx < invoiceStates.length - 1,
+              goPrev: () => goToInvoice(currentIdx - 1),
+              goNext: () => goToInvoice(currentIdx + 1),
+              readyCount: invoiceStates.filter(s => s.status === 'ready').length,
+            }}
+            status={invoiceStates[currentIdx]?.status}
+            onMarkReady={(newStatus) => setInvoiceStatus(currentIdx, newStatus)}
+            onSendAll={sendAll}
+            sendingAll={sendingAll}
+          />
+        </>
+      )}
+
+      {/* Manual flow — single invoice, immediate send */}
+      {!loading && step === 'match' && mode === 'manual' && (
         <MatchStep
           data={{ ...scannedData, items: matchedItems || scannedData?.items }}
           products={products}
           vendors={vendors}
           vendorMappings={vendorMappings}
-          onPush={handlePush}
+          onPush={handleManualPush}
           onBack={reset}
-          isManual={mode === 'manual'}
+          isManual={true}
         />
       )}
+
       {step === 'success' && <SuccessStep count={doneCount} onReset={reset} />}
     </div>
   )

@@ -200,14 +200,14 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl flex items-center justify-center py-32">
+      <div className="w-full flex items-center justify-center py-32">
         <Loader2 className="w-7 h-7 text-primary animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="max-w-6xl animate-page">
+    <div className="w-full animate-page">
       {/* Welcome + Qoyod Status */}
       <div className="mb-6 sm:mb-8 relative overflow-hidden bg-white rounded-2xl border border-border-light px-6 py-5" style={{
         backgroundImage: 'linear-gradient(rgba(16,185,129,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(16,185,129,0.05) 1px, transparent 1px)',

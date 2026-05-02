@@ -10,7 +10,6 @@ import {
   X,
   Users,
   Package,
-  Receipt,
   FileText,
   LogOut,
 } from 'lucide-react'
@@ -30,7 +29,6 @@ const navSections = [
     label: 'المحاسبة',
     items: [
       { to: '/invoices', label: 'الفواتير', icon: FileText },
-      { to: '/payments', label: 'سندات الصرف', icon: Receipt },
     ],
   },
   {

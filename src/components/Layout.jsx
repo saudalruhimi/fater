@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
-import { Search, Bell, X, FileText, CheckCircle2, AlertCircle, Clock, Trash2, Megaphone, Sparkles, ArrowLeft, Sun, Moon } from 'lucide-react'
+import { Search, Bell, X, FileText, CheckCircle2, AlertCircle, AlertTriangle, Clock, Trash2, Megaphone, Sparkles, ArrowLeft, Sun, Moon } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -32,10 +32,35 @@ function timeAgo(date) {
   return `منذ ${Math.floor(diff / 86400)} ي`
 }
 
+// Persistent warning banner about a known invoice format issue
+function ZakharefWarning() {
+  return (
+    <div
+      className="mb-4 sm:mb-6 flex items-start gap-3 rounded-2xl px-4 py-3 sm:px-5 sm:py-4"
+      style={{ background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)' }}
+    >
+      <div
+        className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: 'rgba(245,158,11,0.18)' }}
+      >
+        <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" strokeWidth={1.8} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] sm:text-sm font-bold text-amber-500 mb-0.5">تنبيه: فواتير شركة زخارف البيت</p>
+        <p className="text-[12px] sm:text-[13px] leading-relaxed text-text-secondary">
+          فواتير زخارف البيت لا تُستخرج بشكل دقيق حالياً. في حال رغبتكم باستخدام الذكاء الاصطناعي يرجى التحقق والتأكد من المخرجات، أو
+          <span className="font-semibold text-text"> إدخالها يدوياً </span>
+          لضمان الدقة.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // Bump this when you publish a new update entry in pages/Updates.jsx (use date or date+suffix)
-const LATEST_UPDATE_DATE = '2026-04-26-2'
-const LATEST_UPDATE_VERSION = 'v1.3.0'
-const LATEST_UPDATE_TITLE = 'لمسات تستحق التجربة...'
+const LATEST_UPDATE_DATE = '2026-05-02'
+const LATEST_UPDATE_VERSION = 'v1.4.0'
+const LATEST_UPDATE_TITLE = 'تجهيز جماعي للفواتير + تصميم محسّن'
 
 export default function Layout() {
   const location = useLocation()
@@ -129,9 +154,9 @@ export default function Layout() {
     <div className="min-h-screen bg-bg overflow-x-hidden">
       <Sidebar />
 
-      <div className="lg:mr-60">
+      <div className="lg:mr-60 pt-14">
         {/* Top Bar */}
-        <header className="sticky top-0 z-10 bg-bg/80 backdrop-blur-sm border-b border-border-light px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+        <header className="fixed top-0 right-0 left-0 lg:right-60 z-20 bg-bg/95 backdrop-blur-sm border-b border-border-light px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
           <div className="w-10 lg:hidden" />
 
           <div className="relative hidden sm:block">
@@ -253,6 +278,7 @@ export default function Layout() {
 
         {/* Content */}
         <main className="p-4 sm:p-6 lg:p-8">
+          <ZakharefWarning />
           <Outlet />
         </main>
       </div>

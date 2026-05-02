@@ -23,14 +23,32 @@ router.post('/push', async (req, res) => {
     const isInclusive = req.body.is_inclusive ?? false
     console.log('is_inclusive:', isInclusive)
 
-    const line_items = items.map((item) => ({
-      product_id: item.product_id,
-      description: item.description || '',
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-      tax_percent: item.tax_percent ?? 15,
-      is_inclusive: isInclusive,
-    }))
+    // Qoyod's `discount` on line_items is a PERCENTAGE (0-100). When the UI sends
+    // a money discount (`discount_type: 'amount'`), convert it; otherwise pass-through.
+    const line_items = items.map((item) => {
+      const qty = Number(item.quantity) || 0
+      const unit = Number(item.unit_price) || 0
+      const disc = Number(item.discount) || 0
+      const dtype = item.discount_type === 'percent' ? 'percent' : 'amount'
+      let discountPct = 0
+      if (disc > 0) {
+        if (dtype === 'percent') {
+          discountPct = disc
+        } else {
+          const gross = qty * unit
+          discountPct = gross > 0 ? Math.round((disc / gross) * 1000000) / 10000 : 0
+        }
+      }
+      return {
+        product_id: item.product_id,
+        description: item.description || '',
+        quantity: qty,
+        unit_price: unit,
+        tax_percent: item.tax_percent ?? 15,
+        is_inclusive: isInclusive,
+        discount: Math.min(Math.max(discountPct, 0), 100),
+      }
+    })
 
     const bill = await qoyod.createBill({
       contact_id: contactId,
@@ -42,14 +60,23 @@ router.post('/push', async (req, res) => {
       line_items,
     })
 
-    // 3. Save to Supabase
+    // 3. Save to Supabase — use the original money-amount discount from request items
     const billId = bill?.bill?.id || bill?.id || null
+    const subtotal = items.reduce((sum, i) => {
+      const qty = Number(i.quantity) || 0
+      const unit = Number(i.unit_price) || 0
+      const disc = Number(i.discount) || 0
+      const dtype = i.discount_type === 'percent' ? 'percent' : 'amount'
+      const gross = qty * unit
+      const lineExcl = dtype === 'percent' ? gross * (1 - disc / 100) : gross - disc
+      return sum + lineExcl
+    }, 0)
     await supabase.from('processed_invoices').insert({
       vendor_name,
       invoice_number,
       invoice_date,
-      total_amount: items.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0),
-      vat_amount: items.reduce((sum, i) => sum + (i.quantity * i.unit_price * (i.tax_percent || 15) / 100), 0),
+      total_amount: subtotal,
+      vat_amount: subtotal * 0.15,
       matched_data: { items },
       qoyod_bill_id: billId,
       status: billId ? 'pushed' : 'error',

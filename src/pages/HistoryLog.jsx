@@ -101,14 +101,14 @@ export default function HistoryLog() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl flex items-center justify-center py-32">
+      <div className="w-full flex items-center justify-center py-32">
         <Loader2 className="w-7 h-7 text-primary animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="max-w-5xl animate-page">
+    <div className="w-full animate-page">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
         <div>

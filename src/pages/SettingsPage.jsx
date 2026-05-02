@@ -34,7 +34,6 @@ const TABS = [
   { key: 'profile', label: 'الملف الشخصي', icon: User },
   { key: 'company', label: 'بيانات الشركة', icon: Building2 },
   { key: 'notifications', label: 'الإشعارات', icon: Bell },
-  { key: 'appearance', label: 'المظهر', icon: Palette },
 ]
 
 function Toggle({ checked, onChange }) {
@@ -617,7 +616,7 @@ function AppearanceTab() {
 export default function SettingsPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
-  const availableTabs = isAdmin ? TABS : TABS.filter(t => ['profile', 'appearance', 'integrations'].includes(t.key))
+  const availableTabs = isAdmin ? TABS : TABS.filter(t => ['profile', 'integrations'].includes(t.key))
   const [activeTab, setActiveTab] = useState(isAdmin ? 'integrations' : 'profile')
 
   const ActiveComponent = {
@@ -625,11 +624,10 @@ export default function SettingsPage() {
     profile: ProfileTab,
     company: CompanyTab,
     notifications: NotificationsTab,
-    appearance: AppearanceTab,
   }[activeTab]
 
   return (
-    <div className="max-w-5xl animate-page">
+    <div className="w-full animate-page">
       <div className="mb-6 sm:mb-8">
         <h1 className="text-lg sm:text-xl font-bold text-text">الإعدادات</h1>
         <p className="text-xs sm:text-sm text-text-muted mt-1">إدارة حسابك وتفضيلات النظام</p>
