@@ -350,7 +350,7 @@ const chatSessions = new Map()
 export async function processMessage(userId, text, imageBuffer = null, mimeType = null) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-flash-latest',
     systemInstruction: `أنت "فاتِر" — مساعد محاسبة ذكي لمؤسسة سعودية. تتكلم بالعربي العامي السعودي البسيط.
 
 مهامك:

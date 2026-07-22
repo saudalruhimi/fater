@@ -13,19 +13,17 @@ export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
-    setTimeout(() => {
-      const result = login(username.trim(), password)
-      if (result.success) {
-        navigate('/', { replace: true })
-      } else {
-        setError(result.error)
-      }
-      setLoading(false)
-    }, 400)
+    const result = await login(username.trim(), password)
+    if (result.success) {
+      navigate('/', { replace: true })
+    } else {
+      setError(result.error)
+    }
+    setLoading(false)
   }
 
   return (

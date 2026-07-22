@@ -11,10 +11,13 @@ import {
   Users,
   Package,
   FileText,
+  CreditCard,
   LogOut,
+  Shield,
+  ChevronDown,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { useAuth, UPLOADER_ALLOWED_ROUTES } from '../contexts/AuthContext'
+import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
 const navSections = [
@@ -29,6 +32,7 @@ const navSections = [
     label: 'المحاسبة',
     items: [
       { to: '/invoices', label: 'الفواتير', icon: FileText },
+      { to: '/payments', label: 'سندات الصرف', icon: CreditCard },
     ],
   },
   {
@@ -41,6 +45,19 @@ const navSections = [
     ],
   },
   {
+    label: 'الإدارة',
+    items: [
+      {
+        label: 'المستخدمين',
+        icon: Users,
+        children: [
+          { to: '/users', label: 'المستخدمين' },
+          { to: '/users/roles', label: 'الأدوار والصلاحيات' },
+        ],
+      },
+    ],
+  },
+  {
     label: 'النظام',
     items: [
       { to: '/history', label: 'السجل', icon: History },
@@ -49,11 +66,77 @@ const navSections = [
   },
 ]
 
+// Parent nav item with collapsible children — auto-expands when a child route is active.
+// Uses a CSS grid-rows trick (0fr → 1fr) for a smooth, content-aware open/close animation.
+function ParentItem({ item, currentPath }) {
+  const isChildActive = item.children.some(c => currentPath === c.to || currentPath.startsWith(c.to + '/'))
+  const [expanded, setExpanded] = useState(isChildActive)
+  useEffect(() => { if (isChildActive) setExpanded(true) }, [isChildActive])
+
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 ${
+          isChildActive
+            ? 'bg-primary-50 text-primary-dark font-semibold'
+            : 'text-text-secondary hover:bg-surface-lighter hover:text-text'
+        }`}
+        aria-expanded={expanded}
+      >
+        <item.icon
+          className={`w-[18px] h-[18px] ${isChildActive ? 'text-primary' : ''}`}
+          strokeWidth={isChildActive ? 2 : 1.6}
+        />
+        <span>{item.label}</span>
+        <ChevronDown
+          className={`mr-auto w-3.5 h-3.5 transition-transform duration-300 ease-out ${expanded ? 'rotate-180' : ''} ${isChildActive ? 'text-primary' : 'text-text-muted'}`}
+          strokeWidth={2}
+        />
+      </button>
+
+      {/* Animated dropdown — grid-rows transition for smooth open/close */}
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-out"
+        style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+      >
+        <div className="overflow-hidden">
+          <div
+            className={`mt-0.5 mr-6 border-r border-border-light/70 pr-3 flex flex-col gap-0.5 transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0'}`}
+          >
+            {item.children.map((child) => (
+              <NavLink
+                key={child.to}
+                to={child.to}
+                end={child.to === '/users'}
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 rounded-md text-[12.5px] transition-all duration-150 ${
+                    isActive
+                      ? 'bg-primary-50 text-primary-dark font-semibold'
+                      : 'text-text-secondary hover:bg-surface-lighter hover:text-text'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <span className={`w-1 h-1 rounded-full ${isActive ? 'bg-primary' : 'bg-text-muted/40'}`} />
+                    <span>{child.label}</span>
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Sidebar() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, logout, canAccess } = useAuth()
   const [profileName, setProfileName] = useState('')
   const [profileRole, setProfileRole] = useState('')
 
@@ -79,17 +162,22 @@ export default function Sidebar() {
     }
   }, [user])
 
-  // Filter nav sections based on role
-  const filteredSections = user?.role === 'ADMIN'
-    ? navSections
-    : navSections
-        .map((section) => ({
-          ...section,
-          items: section.items.filter((item) =>
-            UPLOADER_ALLOWED_ROUTES.includes(item.to)
-          ),
-        }))
-        .filter((section) => section.items.length > 0)
+  // Filter nav sections based on the user's actual permissions.
+  // For parent items (with children), keep them if any child route is accessible.
+  const filteredSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items
+        .map((item) => {
+          if (item.children) {
+            const allowedChildren = item.children.filter((c) => canAccess(c.to))
+            return allowedChildren.length ? { ...item, children: allowedChildren } : null
+          }
+          return canAccess(item.to) ? item : null
+        })
+        .filter(Boolean),
+    }))
+    .filter((section) => section.items.length > 0)
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -160,31 +248,35 @@ export default function Sidebar() {
               <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider px-3 mb-1.5">{section.label}</p>
               <div className="flex flex-col gap-0.5">
                 {section.items.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.to === '/'}
-                    className={({ isActive }) =>
-                      `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 ${
-                        isActive
-                          ? 'bg-primary-50 text-primary-dark font-semibold'
-                          : 'text-text-secondary hover:bg-surface-lighter hover:text-text'
-                      }`
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <item.icon
-                          className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : ''}`}
-                          strokeWidth={isActive ? 2 : 1.6}
-                        />
-                        <span>{item.label}</span>
-                        {isActive && (
-                          <span className="mr-auto w-1.5 h-1.5 rounded-full bg-primary" />
+                  item.children
+                    ? <ParentItem key={item.label} item={item} currentPath={location.pathname} />
+                    : (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        end={item.to === '/'}
+                        className={({ isActive }) =>
+                          `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 ${
+                            isActive
+                              ? 'bg-primary-50 text-primary-dark font-semibold'
+                              : 'text-text-secondary hover:bg-surface-lighter hover:text-text'
+                          }`
+                        }
+                      >
+                        {({ isActive }) => (
+                          <>
+                            <item.icon
+                              className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : ''}`}
+                              strokeWidth={isActive ? 2 : 1.6}
+                            />
+                            <span>{item.label}</span>
+                            {isActive && (
+                              <span className="mr-auto w-1.5 h-1.5 rounded-full bg-primary" />
+                            )}
+                          </>
                         )}
-                      </>
-                    )}
-                  </NavLink>
+                      </NavLink>
+                    )
                 ))}
               </div>
             </div>

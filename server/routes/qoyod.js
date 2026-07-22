@@ -89,6 +89,16 @@ router.post('/push', async (req, res) => {
   }
 })
 
+// GET /api/qoyod/bills — unpaid (Approved) bills from Qoyod
+router.get('/bills', async (req, res) => {
+  try {
+    const bills = await qoyod.getBills()
+    res.json({ success: true, bills })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // GET /api/qoyod/products
 // GET /api/qoyod/next-bill-number — find next available BILL-N reference from Qoyod
 router.get('/next-bill-number', async (req, res) => {
@@ -172,11 +182,64 @@ router.get('/bill-payments', async (req, res) => {
   }
 })
 
-// POST /api/qoyod/bill-payments
+// POST /api/qoyod/bill-payments — create in Qoyod, then log to sent_vouchers
 router.post('/bill-payments', async (req, res) => {
   try {
-    const result = await qoyod.createBillPayment(req.body)
+    const { bill_id, account_id, amount, date, reference, description, vendor_name, invoice_number, account_name } = req.body
+    const result = await qoyod.createBillPayment({ bill_id, account_id, amount, date, reference, description })
+    const receiptId = result?.receipt?.id || result?.id || null
+
+    // Log to Supabase — best-effort, never fail the payment over a logging error
+    try {
+      await supabase.from('sent_vouchers').insert({
+        qoyod_receipt_id: receiptId,
+        bill_id, vendor_name, invoice_number,
+        amount, payment_date: date, account_id, account_name, reference,
+      })
+    } catch (logErr) {
+      console.error('sent_vouchers log failed:', logErr.message)
+    }
+
+    res.json({ success: true, payment: result, receipt_id: receiptId })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// PUT /api/qoyod/bill-payments/:id — update in Qoyod, then sync sent_vouchers
+router.put('/bill-payments/:id', async (req, res) => {
+  try {
+    const { amount, date, account_id, reference, description, account_name } = req.body
+    const result = await qoyod.updateBillPayment(req.params.id, { amount, date, account_id, reference, description })
+
+    try {
+      const patch = {}
+      if (amount !== undefined) patch.amount = amount
+      if (date !== undefined) patch.payment_date = date
+      if (account_id !== undefined) patch.account_id = account_id
+      if (account_name !== undefined) patch.account_name = account_name
+      if (reference !== undefined) patch.reference = reference
+      await supabase.from('sent_vouchers').update(patch).eq('qoyod_receipt_id', req.params.id)
+    } catch (syncErr) {
+      console.error('sent_vouchers sync failed:', syncErr.message)
+    }
+
     res.json({ success: true, payment: result })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// DELETE /api/qoyod/bill-payments/:id — delete from Qoyod, then remove from sent_vouchers
+router.delete('/bill-payments/:id', async (req, res) => {
+  try {
+    await qoyod.deleteBillPayment(req.params.id)
+    try {
+      await supabase.from('sent_vouchers').delete().eq('qoyod_receipt_id', req.params.id)
+    } catch (syncErr) {
+      console.error('sent_vouchers delete-sync failed:', syncErr.message)
+    }
+    res.json({ success: true })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }

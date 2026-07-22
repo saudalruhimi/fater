@@ -1,4 +1,4 @@
-import { Sparkles, Plus, Wrench, Zap, Bug, Megaphone, Search, FileText, BarChart3, BellRing, ScanLine, FileCheck2, Bookmark, Type, Filter as FilterIcon, Hash, Calendar, ListFilter, EyeOff, Trash2, Lock, Shield, UserCog, Palette, Activity, Database, MessageCircle, Network, Sliders, X, Pencil, Info, Moon, ChevronLeft, ChevronRight, Share2, Link as LinkIcon, Layers, Send, Percent, Calculator, Package, LayoutGrid, Target, Newspaper, ArrowLeftRight } from 'lucide-react'
+import { Sparkles, Plus, Wrench, Zap, Bug, Megaphone, Search, FileText, BarChart3, BellRing, ScanLine, FileCheck2, Bookmark, Type, Filter as FilterIcon, Hash, Calendar, ListFilter, EyeOff, Trash2, Lock, Shield, UserCog, Palette, Activity, Database, MessageCircle, Network, Sliders, X, Pencil, Info, Moon, ChevronLeft, ChevronRight, Share2, Link as LinkIcon, Layers, Send, Percent, Calculator, Package, LayoutGrid, Target, Newspaper, ArrowLeftRight, CreditCard, Wallet, History } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 
 const TYPES = {
@@ -12,6 +12,20 @@ const TYPES = {
 const TYPE_ORDER = ['feature', 'improvement', 'add', 'fix', 'maintenance']
 
 const UPDATES = [
+  {
+    version: 'v1.5.0',
+    date: '2026-07-22',
+    title: 'سندات الصرف — ادفع فواتيرك من رصد',
+    summary: 'قسم جديد كامل لإدارة سندات الصرف. صرت تدفع فواتير المشتريات غير المدفوعة مباشرة من رصد بدون ما تدخل قيود — بضغطة وحدة، بنفس مبلغ الفاتورة وتاريخها بالضبط. تقدر تدفع فاتورة وحدة أو عدة فواتير دفعة وحدة، تفلتر بالبحث والتاريخ وتستثني موردين معينين، وعندك سجل كامل للسندات المرسلة مقسّم حسب المورد مع إمكانية التعديل والحذف اللي يتزامن مع قيود مباشرة.',
+    items: [
+      { type: 'feature', icon: CreditCard, text: 'دفع الفواتير غير المدفوعة من رصد', description: 'قسم "سندات الصرف" الجديد يجيب لك كل الفواتير الموافق عليها وغير المدفوعة من قيود. تختار حساب الدفع مرة وحدة، وتضغط "دفع" على أي فاتورة — يتسجّل سند الصرف بنفس مبلغ الفاتورة وبتاريخها بالضبط. مافيه إدخال يدوي ولا دخول للموقع.' },
+      { type: 'feature', icon: Wallet, text: 'الدفع الجماعي', description: 'حدّد عدة فواتير دفعة وحدة عن طريق مربعات الاختيار، أو حدّد الكل، ويطلع لك شريط فيه إجمالي المبلغ وعدد الفواتير. اضغط "دفع المحدد" وينبعث كل السندات بالتتابع مع عدّاد تقدّم — مثالي لتسديد متراكم عدة أشهر مرة وحدة.' },
+      { type: 'feature', icon: Sliders, text: 'فلترة وبحث متقدم', description: 'ابحث بالمورد أو رقم الفاتورة، فلتر بنطاق تاريخ من-إلى، واستثنِ موردين معينين بالبحث عن أسمائهم (مثلاً: كل الفواتير ما عدا شركة كذا). كل فلتر يحدّث الإجمالي المعروض لحظياً.' },
+      { type: 'feature', icon: History, text: 'سجل السندات المرسلة', description: 'تبويب "سجل السندات" يعرض كل السندات اللي أرسلتها من رصد على شكل كروت لكل مورد (عدد السندات + الإجمالي). اضغط على أي مورد يفتح لك سنداته مع بحث برقم السند أو رقم الفاتورة أو المبلغ.' },
+      { type: 'feature', icon: Pencil, text: 'تعديل وحذف السندات', description: 'من داخل سجل المورد تقدر تعدّل السند (المبلغ، التاريخ، الحساب، المرجع) أو تحذفه — والتغيير يتزامن مباشرة مع قيود. تعدّل في رصد يتعدّل في قيود، تحذف من رصد ينحذف من قيود.' },
+      { type: 'fix', icon: Bug, text: 'تحديث محرك قراءة الفواتير', description: 'حدّثنا نموذج الذكاء الاصطناعي المستخدم في قراءة الفواتير بعد إيقاف الإصدار القديم من مزوّد الخدمة، فرجعت القراءة تشتغل بشكل طبيعي.' },
+    ],
+  },
   {
     version: 'v1.4.0',
     date: '2026-05-02',

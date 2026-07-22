@@ -7,6 +7,9 @@ import qoyodRoutes from './routes/qoyod.js'
 import mappingsRoutes from './routes/mappings.js'
 import vendorMappingsRoutes from './routes/vendorMappings.js'
 import telegramRoutes from './routes/telegram.js'
+import authRoutes from './routes/auth.js'
+import adminRoutes from './routes/admin.js'
+import { authenticate, bootstrapAuth } from './services/auth.js'
 
 dotenv.config()
 
@@ -23,29 +26,26 @@ app.use('/api/qoyod', qoyodRoutes)
 app.use('/api/mappings', mappingsRoutes)
 app.use('/api/vendor-mappings', vendorMappingsRoutes)
 app.use('/api/telegram', telegramRoutes)
+app.use('/api/auth', authRoutes)
+app.use('/api/admin', adminRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Mobile auth (server-side validation)
-const MOBILE_USERS = [
-  { username: 'saud', password: '114545745Sa&', role: 'ADMIN' },
-  { username: 'users', password: 'Rakan123', role: 'UPLOADER' },
-]
-app.post('/api/mobile/auth', (req, res) => {
+// Mobile auth — same DB-backed flow as web
+app.post('/api/mobile/auth', async (req, res) => {
   const { username, password } = req.body || {}
-  if (!username || !password) {
-    return res.status(400).json({ success: false, error: 'بيانات ناقصة' })
+  try {
+    const result = await authenticate(username, password)
+    res.json({ success: true, user: { username: result.user.username, role: result.user.role } })
+  } catch (e) {
+    res.status(401).json({ success: false, error: e.message })
   }
-  const u = String(username).trim().toLowerCase()
-  const found = MOBILE_USERS.find((x) => x.username.toLowerCase() === u)
-  if (!found) return res.status(401).json({ success: false, error: 'اسم المستخدم غير موجود' })
-  if (found.password !== password) return res.status(401).json({ success: false, error: 'كلمة المرور غير صحيحة' })
-  res.json({ success: true, user: { username: found.username, role: found.role } })
 })
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT}`)
+  await bootstrapAuth()
 })

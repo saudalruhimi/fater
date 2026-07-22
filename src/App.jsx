@@ -13,6 +13,8 @@ import Payments from './pages/Payments'
 import HistoryLog from './pages/HistoryLog'
 import SettingsPage from './pages/SettingsPage'
 import Updates from './pages/Updates'
+import Users from './pages/Users'
+import Roles from './pages/Roles'
 import { useAuth } from './contexts/AuthContext'
 
 function App() {
@@ -39,6 +41,8 @@ function App() {
         <Route path="/history" element={<ProtectedRoute><HistoryLog /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/updates" element={<ProtectedRoute><Updates /></ProtectedRoute>} />
+        <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
+        <Route path="/users/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
       </Route>
 
       {/* Catch-all */}

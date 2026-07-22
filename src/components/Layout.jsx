@@ -58,9 +58,9 @@ function ZakharefWarning() {
 }
 
 // Bump this when you publish a new update entry in pages/Updates.jsx (use date or date+suffix)
-const LATEST_UPDATE_DATE = '2026-05-02'
-const LATEST_UPDATE_VERSION = 'v1.4.0'
-const LATEST_UPDATE_TITLE = 'تجهيز جماعي للفواتير + تصميم محسّن'
+const LATEST_UPDATE_DATE = '2026-07-22'
+const LATEST_UPDATE_VERSION = 'v1.5.0'
+const LATEST_UPDATE_TITLE = 'سندات الصرف — ادفع فواتيرك من رصد'
 
 export default function Layout() {
   const location = useLocation()

@@ -2,12 +2,9 @@ import { createContext, useContext, useState, useEffect } from 'react'
 
 const AuthContext = createContext(null)
 
-const USERS = [
-  { username: 'saud', password: '114545745Sa&', role: 'ADMIN' },
-  { username: 'users', password: 'Rakan123', role: 'UPLOADER' },
-]
+const API_URL = import.meta.env.DEV ? 'http://localhost:3001/api' : '/api'
 
-// Routes the UPLOADER role can access
+// Backwards-compat fallback: used only when permissions array is missing on a stale stored user
 export const UPLOADER_ALLOWED_ROUTES = ['/', '/upload', '/invoices', '/vendors', '/products', '/dictionary', '/vendor-dictionary', '/settings', '/updates']
 
 export function AuthProvider({ children }) {
@@ -28,16 +25,22 @@ export function AuthProvider({ children }) {
     }
   }, [user])
 
-  function login(username, password) {
-    const found = USERS.find(
-      (u) =>
-        u.username.toLowerCase() === username.toLowerCase() &&
-        u.password === password
-    )
-    if (!found) return { success: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة' }
-    const authUser = { username: found.username, role: found.role }
-    setUser(authUser)
-    return { success: true }
+  async function login(username, password) {
+    try {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        return { success: false, error: data?.error || 'اسم المستخدم أو كلمة المرور غير صحيحة' }
+      }
+      setUser(data.user)
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: 'فشل الاتصال بالسيرفر' }
+    }
   }
 
   function logout() {
@@ -46,7 +49,13 @@ export function AuthProvider({ children }) {
 
   function canAccess(path) {
     if (!user) return false
-    if (user.role === 'ADMIN') return true
+    if (user.is_admin || user.role === 'ADMIN') return true
+    const perms = user.permissions
+    if (Array.isArray(perms)) {
+      if (perms.includes('*')) return true
+      return perms.includes(path)
+    }
+    // Stale stored user without permissions array — fall back to legacy list
     return UPLOADER_ALLOWED_ROUTES.includes(path)
   }
 

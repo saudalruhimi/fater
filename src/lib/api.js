@@ -56,8 +56,11 @@ export function getNextBillNumber(prefix = 'BILL') { return request('GET', `/qoy
 
 // Accounts & Bill Payments
 export function getAccounts() { return request('GET', '/qoyod/accounts') }
+export function getBills() { return request('GET', '/qoyod/bills') }
 export function getBillPayments() { return request('GET', '/qoyod/bill-payments') }
 export function createBillPayment(data) { return request('POST', '/qoyod/bill-payments', data) }
+export function updateBillPayment(id, data) { return request('PUT', `/qoyod/bill-payments/${id}`, data) }
+export function deleteBillPayment(id) { return request('DELETE', `/qoyod/bill-payments/${id}`) }
 
 // Vendors CRUD
 export function createVendor(data) { return request('POST', '/qoyod/vendors', data) }
@@ -75,3 +78,15 @@ export function getVendorMappings() { return request('GET', '/vendor-mappings') 
 export function createVendorMapping(data) { return request('POST', '/vendor-mappings', data) }
 export function updateVendorMapping(id, data) { return request('PUT', `/vendor-mappings/${id}`, data) }
 export function deleteVendorMapping(id) { return request('DELETE', `/vendor-mappings/${id}`) }
+
+// Admin: users
+export function adminListUsers() { return request('GET', '/admin/users') }
+export function adminCreateUser(data) { return request('POST', '/admin/users', data) }
+export function adminUpdateUser(id, data) { return request('PUT', `/admin/users/${id}`, data) }
+export function adminDeleteUser(id) { return request('DELETE', `/admin/users/${id}`) }
+
+// Admin: roles + permissions
+export function adminListRoles() { return request('GET', '/admin/roles') }
+export function adminCreateRole(data) { return request('POST', '/admin/roles', data) }
+export function adminUpdateRole(key, data) { return request('PUT', `/admin/roles/${key}`, data) }
+export function adminDeleteRole(key) { return request('DELETE', `/admin/roles/${key}`) }

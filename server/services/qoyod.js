@@ -131,6 +131,29 @@ export async function getAccounts() {
   return accounts.map((a) => ({ ...a, name: a.name_ar || a.name_en || '' }))
 }
 
+// Bills — fetch all pages, return unpaid bills (Approved + Overdue, not Paid/Returned/Draft)
+export async function getBills() {
+  let all = []
+  for (let page = 1; page <= 30; page++) {
+    let bills
+    try {
+      const data = await request('GET', `/bills?page=${page}`)
+      bills = data.bills || []
+    } catch {
+      break
+    }
+    all = all.concat(bills)
+    if (bills.length < 100) break
+  }
+
+  const uniqueStatuses = [...new Set(all.map(b => b.status))]
+  console.log('[getBills] statuses from Qoyod:', uniqueStatuses)
+
+  // Exclude paid, returned/refunded, draft, cancelled — include everything else (Approved, Overdue, etc.)
+  const EXCLUDE = new Set(['Paid', 'Returned', 'Refunded', 'Draft', 'Cancelled', 'paid', 'returned', 'refunded', 'draft', 'cancelled'])
+  return all.filter(b => !EXCLUDE.has(b.status))
+}
+
 // Bill Payments
 export async function getBillPayments() {
   const data = await request('GET', '/bill_payments')
@@ -141,6 +164,20 @@ export async function createBillPayment({ bill_id, amount, date, account_id, ref
   return request('POST', '/bill_payments', {
     bill_payment: { bill_id, account_id, amount, date, reference, description },
   })
+}
+
+export async function updateBillPayment(id, { amount, date, account_id, reference, description }) {
+  const bill_payment = {}
+  if (amount !== undefined) bill_payment.amount = amount
+  if (date !== undefined) bill_payment.date = date
+  if (account_id !== undefined) bill_payment.account_id = account_id
+  if (reference !== undefined) bill_payment.reference = reference
+  if (description !== undefined) bill_payment.description = description
+  return request('PUT', `/bill_payments/${id}`, { bill_payment })
+}
+
+export async function deleteBillPayment(id) {
+  return request('DELETE', `/bill_payments/${id}`)
 }
 
 // Inventories
