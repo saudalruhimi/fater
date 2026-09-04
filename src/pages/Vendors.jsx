@@ -1,6 +1,7 @@
 import { Search, Users, Loader2, Plus, Pencil, Trash2, Check, Phone } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import { getVendors, createVendor, updateVendor, deleteVendor } from '../lib/api'
+import { Link } from 'react-router-dom'
 import { PageHeader, Sheet, ConfirmDialog, EmptyState, ledger, field, btn } from '../components/ui'
 
 function VendorForm({ form, setForm }) {
@@ -144,7 +145,13 @@ export default function Vendors() {
                   <tr key={v.id} className={`group ${ledger.row}`}>
                     <td className={`${ledger.td} text-text-muted text-[11px]`}>{i + 1}</td>
                     <td className={ledger.td}>
-                      <p className="font-semibold text-text">{v.name}</p>
+                      <Link
+                        to={`/vendor-files/${encodeURIComponent(v.name)}`}
+                        className="font-semibold text-text hover:text-primary-dark transition-colors"
+                        title="فتح ملف المورد"
+                      >
+                        {v.name}
+                      </Link>
                       {v.email && <p className="text-[11px] text-text-muted mt-0.5" dir="ltr">{v.email}</p>}
                     </td>
                     <td className={`${ledger.td} text-text-secondary`}>{v.organization || '—'}</td>

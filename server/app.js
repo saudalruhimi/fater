@@ -6,6 +6,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import scanRoutes from './routes/scan.js'
 import matchRoutes from './routes/match.js'
+import reconcileRoutes from './routes/reconcile.js'
 import qoyodRoutes from './routes/qoyod.js'
 import mappingsRoutes from './routes/mappings.js'
 import vendorMappingsRoutes from './routes/vendorMappings.js'
@@ -24,6 +25,7 @@ app.use(express.json({ limit: '20mb' }))
 // Routes
 app.use('/api/scan', scanRoutes)
 app.use('/api/match', matchRoutes)
+app.use('/api/reconcile', reconcileRoutes)
 app.use('/api/qoyod', qoyodRoutes)
 app.use('/api/mappings', mappingsRoutes)
 app.use('/api/vendor-mappings', vendorMappingsRoutes)

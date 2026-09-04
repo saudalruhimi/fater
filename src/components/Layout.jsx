@@ -3,7 +3,7 @@ import {
   Bell, X, FileText, CheckCircle2, AlertCircle, AlertTriangle, Clock, Trash2,
   Megaphone, Sparkles, ArrowLeft, Sun, Moon, LayoutDashboard, Upload, CreditCard,
   Users, Package, BookOpen, History, Settings, Shield, ChevronDown, LogOut,
-  LayoutGrid, Database,
+  LayoutGrid, Database, FolderOpen, Scale, Archive,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
@@ -19,12 +19,15 @@ const NAV = [
     children: [
       { to: '/invoices', label: 'الفواتير', icon: FileText },
       { to: '/payments', label: 'سندات الصرف', icon: CreditCard },
+      { to: '/reconcile', label: 'المطابقة', icon: Scale },
+      { to: '/reconcile/archive', label: 'أرشيف المطابقات', icon: Archive },
     ],
   },
   {
     label: 'البيانات', icon: Database,
     children: [
       { to: '/vendors', label: 'الموردين', icon: Users },
+      { to: '/vendor-files', label: 'ملفات الموردين', icon: FolderOpen },
       { to: '/products', label: 'البنود', icon: Package },
       { to: '/dictionary', label: 'قاموس البنود', icon: BookOpen },
       { to: '/vendor-dictionary', label: 'قاموس الموردين', icon: BookOpen },

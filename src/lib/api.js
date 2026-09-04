@@ -44,6 +44,15 @@ export function matchItems(items, vendor_name, retryOpts = {}) {
   return callGeminiWithRetry(() => request('POST', '/match', { items, vendor_name }), retryOpts)
 }
 
+// Reconcile two account statements
+export async function reconcileStatements(ours, theirs) {
+  const [a, b] = await Promise.all([prepareForUpload(ours), prepareForUpload(theirs)])
+  const fd = new FormData()
+  fd.append('ours', a)
+  fd.append('theirs', b)
+  return request('POST', '/reconcile', fd)
+}
+
 // Push to Qoyod
 export function pushToQoyod(invoiceData) {
   return request('POST', '/qoyod/push', invoiceData)

@@ -7,6 +7,10 @@ import UploadInvoice from './pages/UploadInvoice'
 import Dictionary from './pages/Dictionary'
 import VendorDictionary from './pages/VendorDictionary'
 import Vendors from './pages/Vendors'
+import VendorFiles from './pages/VendorFiles'
+import VendorFile from './pages/VendorFile'
+import Reconcile from './pages/Reconcile'
+import ReconcileArchive from './pages/ReconcileArchive'
 import Products from './pages/Products'
 import Invoices from './pages/Invoices'
 import Payments from './pages/Payments'
@@ -35,9 +39,13 @@ function App() {
         <Route path="/dictionary" element={<ProtectedRoute><Dictionary /></ProtectedRoute>} />
         <Route path="/vendor-dictionary" element={<ProtectedRoute><VendorDictionary /></ProtectedRoute>} />
         <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
+        <Route path="/vendor-files" element={<ProtectedRoute><VendorFiles /></ProtectedRoute>} />
+        <Route path="/vendor-files/:name" element={<ProtectedRoute><VendorFile /></ProtectedRoute>} />
         <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
         <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+        <Route path="/reconcile" element={<ProtectedRoute><Reconcile /></ProtectedRoute>} />
+        <Route path="/reconcile/archive" element={<ProtectedRoute><ReconcileArchive /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><HistoryLog /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/updates" element={<ProtectedRoute><Updates /></ProtectedRoute>} />
