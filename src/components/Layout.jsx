@@ -594,7 +594,7 @@ export default function Layout() {
       {/* إعلان عودة الذكاء الاصطناعي — أول ما يشوفه المستخدم، ولا يزاحم مودال التحديثات */}
       {!updateModalOpen && (
         <AnnouncementModal
-          id="ai-restored-2026-09"
+          id="ai-restored-2026-09-04"
           kicker="خبر النظام"
           title="رجع الذكاء الاصطناعي يشتغل"
           until="2026-09-07"

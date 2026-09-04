@@ -219,15 +219,13 @@ export function AnnouncementModal({ id, title, kicker, points = [], until, child
 
   const { mounted, leaving } = usePresence(visible, 300)
 
-  // نسجّل أنه شوهد فوراً، ونترك الإغلاق يكمل حركته قبل الإزالة
+  // نُخفي فوراً ونترك usePresence يُبقيه مركّباً حتى تنتهي حركة الخروج.
+  // تعليم "شوهد" هنا لا يزيله من الشاشة — الإزالة يحرسها mounted.
   const close = useCallback(() => {
     try { localStorage.setItem(key, '1') } catch { /* ignore */ }
+    setSeen(true)
     setVisible(false)
   }, [key])
-
-  useEffect(() => {
-    if (!mounted && !visible) setSeen(true)
-  }, [mounted, visible])
 
   useEffect(() => {
     if (!visible) return
