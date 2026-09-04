@@ -1,6 +1,7 @@
 import { Search, Package, Loader2 } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import { getProducts } from '../lib/api'
+import { PageHeader, EmptyState, ledger } from '../components/ui'
 
 export default function Products() {
   const [products, setProducts] = useState([])
@@ -24,49 +25,52 @@ export default function Products() {
 
   return (
     <div className="w-full animate-page">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold text-text">البنود</h1>
-          <p className="text-xs sm:text-sm text-text-muted mt-1">{products.length} بند مسجّل في قيود</p>
+      <PageHeader
+        kicker="البيانات"
+        title="البنود"
+        description={`${products.length} بند مسجّل في قيود — تُستخدم في مطابقة الفواتير.`}
+      >
+        <div className="relative max-w-md">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" strokeWidth={1.6} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ابحث بالاسم أو الرمز..."
+            className="w-full bg-surface border border-border rounded-full py-2.5 pr-10 pl-4 text-[13px] text-text placeholder-text-muted focus:outline-none focus:border-primary/40 transition-colors"
+          />
         </div>
-      </div>
-
-      {/* Search */}
-      <div className="relative mb-4">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" strokeWidth={1.6} />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="ابحث بالاسم أو الرمز..."
-          className="w-full bg-white border border-border-light rounded-xl py-2.5 pr-10 pl-3.5 text-sm text-text placeholder-text-muted focus:outline-none focus:border-primary/40 transition-colors"
-        />
-      </div>
+      </PageHeader>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-6 h-6 text-primary animate-spin" />
         </div>
       ) : filtered.length > 0 ? (
-        <div className="bg-white rounded-2xl border border-border-light overflow-hidden">
-          <div className="hidden sm:block">
-            <table className="w-full">
+        <>
+          {/* Desktop — ledger table */}
+          <div className={`hidden sm:block ${ledger.wrap}`}>
+            <table className={ledger.table}>
               <thead>
-                <tr className="border-b border-border-light text-[12px] text-text-muted">
-                  <th className="text-right font-medium px-5 py-3">الاسم</th>
-                  <th className="text-right font-medium px-5 py-3">الرمز</th>
-                  <th className="text-right font-medium px-5 py-3">سعر الشراء</th>
-                  <th className="text-right font-medium px-5 py-3">الوحدة</th>
-                  <th className="text-right font-medium px-5 py-3">النوع</th>
+                <tr className={ledger.headRow}>
+                  <th className={`${ledger.th} w-8`}>#</th>
+                  <th className={ledger.th}>الاسم</th>
+                  <th className={ledger.th}>الرمز</th>
+                  <th className={`${ledger.th} text-left`}>سعر الشراء</th>
+                  <th className={ledger.th}>الوحدة</th>
+                  <th className={ledger.th}>النوع</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((p, i) => (
-                  <tr key={p.id} className={`hover:bg-primary-50/20 transition-colors ${i !== filtered.length - 1 ? 'border-b border-border-light/60' : ''}`}>
-                    <td className="px-5 py-3 text-[13px] font-medium text-text">{p.name}</td>
-                    <td className="px-5 py-3 text-[13px] text-text-muted font-mono">{p.sku || '—'}</td>
-                    <td className="px-5 py-3 text-[13px] text-text">{p.buying_price} ر.س</td>
-                    <td className="px-5 py-3 text-[13px] text-text-secondary">{p.unit || '—'}</td>
-                    <td className="px-5 py-3">
+                  <tr key={p.id} className={ledger.row}>
+                    <td className={`${ledger.td} text-text-muted text-[11px]`}>{i + 1}</td>
+                    <td className={`${ledger.td} font-semibold text-text`}>{p.name}</td>
+                    <td className={`${ledger.td} text-text-muted font-mono text-[12px]`}>{p.sku || '—'}</td>
+                    <td className={`${ledger.td} text-left text-text whitespace-nowrap`}>
+                      {p.buying_price} <span className="text-[10px] text-text-muted">ر.س</span>
+                    </td>
+                    <td className={`${ledger.td} text-text-secondary`}>{p.unit || '—'}</td>
+                    <td className={ledger.td}>
                       <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-surface-lighter text-text-secondary">
                         {p.type === 'Product' ? 'منتج' : 'خدمة'}
                       </span>
@@ -77,9 +81,10 @@ export default function Products() {
             </table>
           </div>
 
-          <div className="sm:hidden divide-y divide-border-light/60">
+          {/* Mobile */}
+          <div className="sm:hidden border-t-2 border-text">
             {filtered.map((p) => (
-              <div key={p.id} className="p-4">
+              <div key={p.id} className="py-3.5 border-b border-border-light">
                 <p className="text-[13px] font-semibold text-text">{p.name}</p>
                 <div className="flex items-center gap-3 mt-1.5 text-[11px] text-text-muted">
                   {p.sku && <span className="font-mono">{p.sku}</span>}
@@ -89,12 +94,9 @@ export default function Products() {
               </div>
             ))}
           </div>
-        </div>
+        </>
       ) : (
-        <div className="bg-white rounded-2xl border border-border-light py-16 flex flex-col items-center">
-          <Package className="w-8 h-8 text-text-muted/30 mb-3" />
-          <p className="text-sm text-text-muted">لا توجد نتائج</p>
-        </div>
+        <EmptyState icon={Package} title="لا توجد نتائج" hint={search ? 'جرّب كلمة بحث أخرى' : undefined} />
       )}
     </div>
   )

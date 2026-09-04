@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import multer from 'multer'
-import sharp from 'sharp'
 import { scanInvoice } from '../services/gemini.js'
 import { supabase } from '../services/supabase.js'
 

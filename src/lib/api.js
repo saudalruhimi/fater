@@ -1,4 +1,5 @@
 import { callGeminiWithRetry } from './gemini'
+import { prepareForUpload } from './imagePrep'
 
 const API_URL = import.meta.env.DEV ? 'http://localhost:3001/api' : '/api'
 
@@ -27,11 +28,13 @@ async function request(method, path, body = null) {
   return data
 }
 
-// Scan (Gemini-backed) — wrapped with retry
-export function scanInvoice(file, retryOpts = {}) {
+// Scan (Gemini-backed) — wrapped with retry.
+// Oversized photos are shrunk first so the request fits the serverless payload cap.
+export async function scanInvoice(file, retryOpts = {}) {
+  const upload = await prepareForUpload(file)
   return callGeminiWithRetry(() => {
     const formData = new FormData()
-    formData.append('image', file)
+    formData.append('image', upload)
     return request('POST', '/scan', formData)
   }, retryOpts)
 }
@@ -56,7 +59,9 @@ export function getNextBillNumber(prefix = 'BILL') { return request('GET', `/qoy
 
 // Accounts & Bill Payments
 export function getAccounts() { return request('GET', '/qoyod/accounts') }
-export function getBills() { return request('GET', '/qoyod/bills') }
+export function getBills({ refresh = false } = {}) {
+  return request('GET', `/qoyod/bills${refresh ? '?refresh=1' : ''}`)
+}
 export function getBillPayments() { return request('GET', '/qoyod/bill-payments') }
 export function createBillPayment(data) { return request('POST', '/qoyod/bill-payments', data) }
 export function updateBillPayment(id, data) { return request('PUT', `/qoyod/bill-payments/${id}`, data) }

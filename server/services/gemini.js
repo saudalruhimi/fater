@@ -3,7 +3,11 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 // ============ Retry helper ============
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-async function callWithRetry(fn, { retries = 3, baseDelay = 2000 } = {}) {
+// Serverless requests have a hard wall (Netlify: 10s by default), so the retry
+// budget has to fit inside it — the old 2s/4s/8s ladder spent 14s sleeping alone
+// and guaranteed a timeout instead of an answer. The frontend retries too, which
+// is where longer backoff belongs.
+async function callWithRetry(fn, { retries = 2, baseDelay = 700 } = {}) {
   let lastErr
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -98,7 +102,7 @@ export async function scanInvoice(imageBuffer, mimeType) {
 
   const result = await callWithRetry(
     () => model.generateContent([SCAN_PROMPT, imagePart]),
-    { retries: 3, baseDelay: 2000 }
+    { retries: 2, baseDelay: 700 }
   )
   const text = result.response.text()
 
@@ -109,7 +113,11 @@ export async function scanInvoice(imageBuffer, mimeType) {
   }
 
   const jsonStr = jsonMatch[1] || jsonMatch[0]
-  return JSON.parse(jsonStr)
+  try {
+    return JSON.parse(jsonStr)
+  } catch {
+    throw new Error('تعذّرت قراءة الفاتورة — الصورة غير واضحة أو التنسيق غير مدعوم. جرّب صورة أوضح أو أدخلها يدوياً.')
+  }
 }
 
 export async function aiMatch(vendorItem, vendorName, qoyodProducts) {
@@ -130,7 +138,7 @@ ${productList}
 
   const result = await callWithRetry(
     () => model.generateContent(prompt),
-    { retries: 2, baseDelay: 1000 }
+    { retries: 1, baseDelay: 600 }
   )
   const text = result.response.text()
 
@@ -138,5 +146,10 @@ ${productList}
   if (!jsonMatch) return { product_id: null, product_name: null, confidence: 0 }
 
   const jsonStr = jsonMatch[1] || jsonMatch[0]
-  return JSON.parse(jsonStr)
+  try {
+    return JSON.parse(jsonStr)
+  } catch {
+    // A malformed suggestion just means "no match" — never break the whole invoice.
+    return { product_id: null, product_name: null, confidence: 0 }
+  }
 }

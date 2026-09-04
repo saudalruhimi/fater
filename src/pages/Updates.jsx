@@ -163,9 +163,9 @@ export default function Updates() {
   const older = idx < UPDATES.length - 1 ? UPDATES[idx + 1] : null
 
   return (
-    <div className="-m-4 sm:-m-6 lg:-m-8 bg-white min-h-[calc(100vh-3.5rem)] animate-page lg:pr-72">
-      {/* Sidebar (right side in RTL) — fixed because Layout has overflow-x-hidden which breaks sticky */}
-      <aside className="hidden lg:flex flex-col w-72 fixed top-14 right-0 lg:right-60 h-[calc(100vh-3.5rem)] bg-bg border-l border-border-light px-5 py-7 overflow-y-auto z-[1]">
+    <div className="animate-page lg:grid lg:grid-cols-[270px_1fr] lg:gap-10 lg:items-start">
+      {/* Versions rail (right side in RTL) — sticky within the page flow */}
+      <aside className="hidden lg:flex flex-col lg:sticky lg:top-24 max-h-[calc(100vh-8rem)] overflow-y-auto pl-5 border-l border-border-light">
         <div className="flex items-center gap-2 mb-4">
           <h2 className="text-sm font-bold text-text">الإصدارات</h2>
           <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-border-light text-text-secondary">{UPDATES.length}</span>
@@ -177,7 +177,7 @@ export default function Updates() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ابحث..."
-            className="w-full bg-white border border-border-light rounded-lg py-2 pr-9 pl-3 text-[13px] text-text placeholder-text-muted focus:outline-none focus:border-primary/40 transition-colors"
+            className="w-full bg-surface border border-border-light rounded-lg py-2 pr-9 pl-3 text-[13px] text-text placeholder-text-muted focus:outline-none focus:border-primary/40 transition-colors"
           />
         </div>
 
@@ -191,7 +191,7 @@ export default function Updates() {
                 key={u.version}
                 onClick={() => setActiveVersion(u.version)}
                 className={`flex gap-3 px-2.5 py-2.5 rounded-lg text-right cursor-pointer transition-all relative ${
-                  active ? 'bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_0_0_1px_var(--color-border-light)]' : 'hover:bg-white/60'
+                  active ? 'bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.04),0_0_0_1px_var(--color-border-light)]' : 'hover:bg-surface/60'
                 }`}
               >
                 {/* Timeline rail */}
@@ -228,7 +228,7 @@ export default function Updates() {
       </aside>
 
       {/* Mobile version picker (visible <lg) */}
-      <div className="lg:hidden fixed top-14 inset-x-0 z-[5] bg-white/95 backdrop-blur-sm border-b border-border-light px-4 py-2 overflow-x-auto">
+      <div className="lg:hidden -mx-4 px-4 py-2 mb-4 border-b border-border-light overflow-x-auto">
         <div className="flex gap-2 w-max">
           {UPDATES.map(u => {
             const active = u.version === activeVersion
@@ -250,8 +250,8 @@ export default function Updates() {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0 lg:pt-0 pt-12">
-        <div className="max-w-3xl mx-auto px-4 sm:px-8 lg:px-12 py-6 sm:py-10 pb-20">
+      <main className="min-w-0">
+        <div className="max-w-3xl pb-12">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-[13px] mb-6 text-text-muted">
             <span>تحديثات النظام</span>
@@ -317,12 +317,12 @@ export default function Updates() {
                   key={t.key}
                   onClick={() => setFilterType(t.key)}
                   className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
-                    active ? 'bg-white text-text font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.04)]' : 'text-text-muted hover:text-text-secondary'
+                    active ? 'bg-surface text-text font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.04)]' : 'text-text-muted hover:text-text-secondary'
                   }`}
                 >
                   {t.label}
                   <span className={`text-[10.5px] font-semibold px-1.5 rounded ${
-                    active ? 'bg-surface-lighter text-text-secondary' : 'bg-white text-text-muted'
+                    active ? 'bg-surface-lighter text-text-secondary' : 'bg-surface text-text-muted'
                   }`}>{t.count}</span>
                 </button>
               )
@@ -393,7 +393,7 @@ export default function Updates() {
               {newer ? (
                 <button
                   onClick={() => setActiveVersion(newer.version)}
-                  className="flex items-center gap-3 p-4 bg-white border border-border-light rounded-xl hover:border-primary/30 hover:bg-surface-light/40 transition-all text-right"
+                  className="flex items-center gap-3 p-4 bg-surface border border-border-light rounded-xl hover:border-primary/30 hover:bg-surface-light/40 transition-all text-right"
                 >
                   <ChevronRight className="w-4 h-4 text-text-muted flex-shrink-0" strokeWidth={2.2} />
                   <div className="flex-1 min-w-0">
@@ -408,7 +408,7 @@ export default function Updates() {
               {older ? (
                 <button
                   onClick={() => setActiveVersion(older.version)}
-                  className="flex items-center justify-end gap-3 p-4 bg-white border border-border-light rounded-xl hover:border-primary/30 hover:bg-surface-light/40 transition-all text-left"
+                  className="flex items-center justify-end gap-3 p-4 bg-surface border border-border-light rounded-xl hover:border-primary/30 hover:bg-surface-light/40 transition-all text-left"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="text-[11px] text-text-muted font-medium mb-0.5">الأقدم</div>

@@ -1,7 +1,8 @@
-import { Shield, ShieldCheck, Check, X, ArrowLeft, LayoutDashboard, Upload, FileText, Users, Package, BookOpen, History, Settings, Megaphone, UserCog, Loader2, Plus, Pencil, Trash2, Lock, Save } from 'lucide-react'
+import { Shield, ShieldCheck, Check, X, ArrowLeft, LayoutDashboard, Upload, FileText, Users, Package, BookOpen, History, Settings, Megaphone, Loader2, Plus, Pencil, Trash2, Lock, Save } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { adminListRoles, adminCreateRole, adminUpdateRole, adminDeleteRole } from '../lib/api'
+import { PageHeader, Sheet, btn } from '../components/ui'
 
 // All app routes — used as the catalog of available permissions
 const APP_ROUTES = [
@@ -27,23 +28,6 @@ const COLORS = [
   { color: '#EF4444', bg: 'rgba(239,68,68,0.10)',  border: 'rgba(239,68,68,0.30)' },
 ]
 function colorFor(idx) { return COLORS[idx % COLORS.length] }
-
-function Modal({ open, onClose, title, children, wide }) {
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
-      <div className={`bg-surface rounded-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-md'} shadow-2xl border border-border-light max-h-[90vh] flex flex-col`} onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-light">
-          <h3 className="text-sm font-bold text-text">{title}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-lighter transition-colors">
-            <X className="w-4 h-4 text-text-muted" />
-          </button>
-        </div>
-        <div className="p-5 overflow-y-auto">{children}</div>
-      </div>
-    </div>
-  )
-}
 
 export default function Roles() {
   const [roles, setRoles] = useState([])
@@ -152,26 +136,17 @@ export default function Roles() {
         <span className="text-text-secondary font-semibold">الأدوار والصلاحيات</span>
       </div>
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
-            <UserCog className="w-5 h-5 text-primary" strokeWidth={1.6} />
-          </div>
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-text">الأدوار والصلاحيات</h1>
-            <p className="text-xs sm:text-sm text-text-muted mt-0.5">{roles.length} أدوار في النظام</p>
-          </div>
-        </div>
-
-        <button
-          onClick={openNew}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary-dark text-white text-[13px] font-bold transition-colors"
-        >
-          <Plus className="w-4 h-4" strokeWidth={2.4} />
-          إضافة دور
-        </button>
-      </div>
+      <PageHeader
+        kicker="الإدارة"
+        title="الأدوار والصلاحيات"
+        description={`${roles.length} أدوار في النظام — كل دور يحدد الصفحات المسموح الوصول لها.`}
+        actions={
+          <button onClick={openNew} className={btn.primary}>
+            <Plus className="w-4 h-4" strokeWidth={2.4} />
+            إضافة دور
+          </button>
+        }
+      />
 
       {/* Roles overview cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-8">
@@ -309,8 +284,23 @@ export default function Roles() {
         ))}
       </div>
 
-      {/* New / Edit role modal */}
-      <Modal open={!!editing} onClose={closeModal} title={editing === 'new' ? 'إضافة دور' : `تعديل: ${editing.label || ''}`} wide>
+      {/* New / Edit role sheet */}
+      <Sheet
+        open={!!editing}
+        onClose={closeModal}
+        title={editing === 'new' ? 'إضافة دور' : `تعديل: ${(editing && editing.label) || ''}`}
+        subtitle="حدد الصفحات المسموح الوصول لها"
+        wide
+        footer={
+          <>
+            <button onClick={save} disabled={saving} className={`${btn.primary} flex-1`}>
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" strokeWidth={2.2} />}
+              {editing === 'new' ? 'إضافة' : 'حفظ'}
+            </button>
+            <button onClick={closeModal} disabled={saving} className={btn.ghost}>إلغاء</button>
+          </>
+        }
+      >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -411,28 +401,10 @@ export default function Roles() {
           )}
 
           {error && (
-            <p className="text-[12px] text-red-500 bg-red-50/60 rounded-lg px-3 py-2">{error}</p>
+            <p className="text-[12px] text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
           )}
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-border-light">
-            <button
-              onClick={closeModal}
-              disabled={saving}
-              className="px-4 py-2 rounded-lg text-text-secondary text-[13px] font-medium hover:bg-surface-lighter transition-colors"
-            >
-              إلغاء
-            </button>
-            <button
-              onClick={save}
-              disabled={saving}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-[13px] font-bold transition-colors disabled:opacity-60"
-            >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" strokeWidth={2.2} />}
-              {editing === 'new' ? 'إضافة' : 'حفظ'}
-            </button>
-          </div>
         </div>
-      </Modal>
+      </Sheet>
     </div>
   )
 }

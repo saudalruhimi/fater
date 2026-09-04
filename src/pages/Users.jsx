@@ -1,31 +1,15 @@
-import { Users as UsersIcon, Shield, ShieldCheck, Loader2, Search, Plus, Pencil, Trash2, X, Lock, KeyRound, Power } from 'lucide-react'
+import { Users as UsersIcon, Shield, ShieldCheck, Loader2, Search, Plus, Pencil, Trash2, Lock, KeyRound, Power } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { adminListUsers, adminCreateUser, adminUpdateUser, adminDeleteUser, adminListRoles } from '../lib/api'
+import { PageHeader, Sheet, EmptyState, field, btn } from '../components/ui'
 
 const ROLE_COLORS = {
-  ADMIN:    { color: '#10B981', bg: 'rgba(16,185,129,0.10)', border: 'rgba(16,185,129,0.25)' },
+  ADMIN:    { color: '#0F7B5F', bg: 'rgba(15,123,95,0.10)', border: 'rgba(15,123,95,0.25)' },
   UPLOADER: { color: '#3B82F6', bg: 'rgba(59,130,246,0.10)', border: 'rgba(59,130,246,0.25)' },
 }
 function roleColor(key) {
   return ROLE_COLORS[key] || { color: '#8B5CF6', bg: 'rgba(139,92,246,0.10)', border: 'rgba(139,92,246,0.25)' }
-}
-
-function Modal({ open, onClose, title, children }) {
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-surface rounded-2xl w-full max-w-md shadow-2xl border border-border-light" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-light">
-          <h3 className="text-sm font-bold text-text">{title}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-lighter transition-colors">
-            <X className="w-4 h-4 text-text-muted" />
-          </button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
-  )
 }
 
 export default function Users() {
@@ -69,7 +53,7 @@ export default function Users() {
     setForm({ username: u.username, password: '', role_key: u.role_key, active: u.active })
     setError('')
   }
-  const closeModal = () => { setEditing(null); setError('') }
+  const closeSheet = () => { setEditing(null); setError('') }
 
   const save = async () => {
     setError('')
@@ -86,7 +70,7 @@ export default function Users() {
         await adminUpdateUser(editing.id, patch)
       }
       await refresh()
-      closeModal()
+      closeSheet()
     } catch (e) {
       setError(e?.message || 'فشل الحفظ')
     } finally { setSaving(false) }
@@ -121,140 +105,138 @@ export default function Users() {
 
   return (
     <div className="w-full animate-page">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
-            <UsersIcon className="w-5 h-5 text-primary" strokeWidth={1.6} />
-          </div>
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-text">المستخدمين</h1>
-            <p className="text-xs sm:text-sm text-text-muted mt-0.5">{users.length} مستخدم</p>
-          </div>
+      <PageHeader
+        kicker="الإدارة"
+        title="المستخدمين"
+        description={`${users.length} مستخدم — الحسابات والأدوار وصلاحيات الوصول.`}
+        actions={
+          <>
+            <Link to="/users/roles" className={btn.ghost}>
+              <Shield className="w-4 h-4" strokeWidth={1.8} />
+              الأدوار والصلاحيات
+            </Link>
+            <button onClick={openNew} className={btn.primary}>
+              <Plus className="w-4 h-4" strokeWidth={2.4} />
+              إضافة مستخدم
+            </button>
+          </>
+        }
+      >
+        <div className="relative max-w-md">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" strokeWidth={1.8} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ابحث باليوزر أو الدور..."
+            className="w-full bg-surface border border-border rounded-full py-2.5 pr-10 pl-4 text-[13px] text-text focus:outline-none focus:border-primary/40"
+          />
         </div>
+      </PageHeader>
 
-        <div className="flex items-center gap-2">
-          <Link
-            to="/users/roles"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface border border-border-light text-text-secondary text-[13px] font-semibold hover:border-primary/30 hover:text-text transition-colors"
-          >
-            <Shield className="w-4 h-4" strokeWidth={1.8} />
-            الأدوار والصلاحيات
-          </Link>
-          <button
-            onClick={openNew}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary-dark text-white text-[13px] font-bold transition-colors"
-          >
-            <Plus className="w-4 h-4" strokeWidth={2.4} />
-            إضافة مستخدم
-          </button>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="mb-5 relative max-w-md">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" strokeWidth={1.8} />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="ابحث باليوزر أو الدور..."
-          className="w-full bg-surface border border-border-light rounded-xl py-2.5 pr-10 pl-3.5 text-[13px] text-text focus:outline-none focus:border-primary/40"
-        />
-      </div>
-
-      {/* Users grid */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((u) => {
-          const role = rolesByKey[u.role_key]
-          const c = roleColor(u.role_key)
-          const RoleIcon = role?.is_admin ? ShieldCheck : Shield
-          const initial = u.username[0]?.toUpperCase() || 'U'
-          return (
-            <div
-              key={u.id}
-              className={`bg-surface border border-border-light rounded-2xl p-5 transition-all ${u.active ? 'hover:border-primary/30' : 'opacity-60'}`}
-            >
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
-                    style={{ background: c.color }}
-                  >
-                    {initial}
+      {/* Users — joined grid */}
+      {filtered.length > 0 ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-px bg-border border border-border rounded-2xl overflow-hidden">
+          {filtered.map((u) => {
+            const role = rolesByKey[u.role_key]
+            const c = roleColor(u.role_key)
+            const RoleIcon = role?.is_admin ? ShieldCheck : Shield
+            const initial = u.username[0]?.toUpperCase() || 'U'
+            return (
+              <div
+                key={u.id}
+                className={`bg-surface p-5 transition-colors ${u.active ? '' : 'opacity-60'}`}
+              >
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div
+                      className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
+                      style={{ background: c.color }}
+                    >
+                      {initial}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-bold text-text truncate" dir="ltr">@{u.username}</p>
+                      {u.is_system && (
+                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-text-muted">
+                          <Lock className="w-2.5 h-2.5" strokeWidth={2.2} />
+                          نظام
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-[14px] font-bold text-text truncate">@{u.username}</p>
-                    {u.is_system && (
-                      <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-text-muted">
-                        <Lock className="w-2.5 h-2.5" strokeWidth={2.2} />
-                        نظام
-                      </span>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => toggleActive(u)}
+                      title={u.active ? 'إيقاف' : 'تفعيل'}
+                      className={`p-1.5 rounded-full transition-colors ${u.active ? 'text-primary hover:bg-primary-50' : 'text-text-muted hover:bg-surface-lighter'}`}
+                    >
+                      <Power className="w-3.5 h-3.5" strokeWidth={2} />
+                    </button>
+                    <button
+                      onClick={() => openEdit(u)}
+                      title="تعديل"
+                      className="p-1.5 rounded-full text-text-muted hover:text-primary hover:bg-primary-50 transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" strokeWidth={2} />
+                    </button>
+                    {!u.is_system && (
+                      <button
+                        onClick={() => remove(u)}
+                        title="حذف"
+                        className="p-1.5 rounded-full text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
+                      </button>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => toggleActive(u)}
-                    title={u.active ? 'إيقاف' : 'تفعيل'}
-                    className={`p-1.5 rounded-lg transition-colors ${u.active ? 'text-primary hover:bg-primary-50' : 'text-text-muted hover:bg-surface-lighter'}`}
-                  >
-                    <Power className="w-3.5 h-3.5" strokeWidth={2} />
-                  </button>
-                  <button
-                    onClick={() => openEdit(u)}
-                    title="تعديل"
-                    className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary-50 transition-colors"
-                  >
-                    <Pencil className="w-3.5 h-3.5" strokeWidth={2} />
-                  </button>
-                  {!u.is_system && (
-                    <button
-                      onClick={() => remove(u)}
-                      title="حذف"
-                      className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
-                    </button>
-                  )}
+                {/* Role badge */}
+                <div
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                  style={{ background: c.bg, border: `1px solid ${c.border}`, color: c.color }}
+                >
+                  <RoleIcon className="w-3 h-3" strokeWidth={2.2} />
+                  <span className="text-[11px] font-bold">{role?.label || u.role_key}</span>
                 </div>
+
+                {!u.active && (
+                  <p className="mt-3 text-[11px] text-red-500 font-medium">⏸ الحساب موقوف — لا يستطيع تسجيل الدخول</p>
+                )}
               </div>
-
-              {/* Role badge */}
-              <div
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-                style={{ background: c.bg, border: `1px solid ${c.border}`, color: c.color }}
-              >
-                <RoleIcon className="w-3 h-3" strokeWidth={2.2} />
-                <span className="text-[11px] font-bold">{role?.label || u.role_key}</span>
-              </div>
-
-              {!u.active && (
-                <p className="mt-3 text-[11px] text-red-500 font-medium">⏸ الحساب موقوف — لا يستطيع تسجيل الدخول</p>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {filtered.length === 0 && (
-        <div className="py-16 flex flex-col items-center text-center">
-          <UsersIcon className="w-8 h-8 text-text-muted/30 mb-2" />
-          <p className="text-sm text-text-muted">لا توجد نتائج</p>
+            )
+          })}
         </div>
+      ) : (
+        <EmptyState icon={UsersIcon} title="لا توجد نتائج" hint="جرّب كلمة بحث أخرى" />
       )}
 
-      {/* New / Edit modal */}
-      <Modal open={!!editing} onClose={closeModal} title={editing === 'new' ? 'إضافة مستخدم' : 'تعديل المستخدم'}>
-        <div className="space-y-3">
+      {/* New / Edit sheet */}
+      <Sheet
+        open={!!editing}
+        onClose={closeSheet}
+        title={editing === 'new' ? 'إضافة مستخدم' : 'تعديل المستخدم'}
+        subtitle={editing !== 'new' && editing ? `@${editing.username}` : 'حساب دخول جديد للنظام'}
+        footer={
+          <>
+            <button onClick={save} disabled={saving} className={`${btn.primary} flex-1`}>
+              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {editing === 'new' ? 'إضافة' : 'حفظ'}
+            </button>
+            <button onClick={closeSheet} disabled={saving} className={btn.ghost}>إلغاء</button>
+          </>
+        }
+      >
+        <div className="space-y-4">
           <div>
-            <label className="block text-[12px] font-semibold text-text mb-1">اسم المستخدم *</label>
+            <label className={field.label}>اسم المستخدم *</label>
             <input
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
               dir="ltr"
               disabled={editing && editing !== 'new' && editing.is_system}
-              className="w-full bg-surface-light border border-border-light rounded-xl py-2.5 px-3.5 text-sm text-text focus:outline-none focus:border-primary/50 disabled:opacity-60"
+              className={`${field.input} disabled:opacity-60`}
             />
             {editing && editing !== 'new' && editing.is_system && (
               <p className="text-[10px] text-text-muted mt-1">مستخدم النظام لا يمكن تغيير اسمه</p>
@@ -262,7 +244,7 @@ export default function Users() {
           </div>
 
           <div>
-            <label className="block text-[12px] font-semibold text-text mb-1">
+            <label className={field.label}>
               <KeyRound className="w-3 h-3 inline-block ml-1" strokeWidth={2} />
               كلمة المرور {editing === 'new' ? '*' : '(اتركها فارغة للإبقاء على الحالية)'}
             </label>
@@ -272,16 +254,16 @@ export default function Users() {
               type="password"
               dir="ltr"
               placeholder={editing === 'new' ? '' : '••••••••'}
-              className="w-full bg-surface-light border border-border-light rounded-xl py-2.5 px-3.5 text-sm text-text focus:outline-none focus:border-primary/50"
+              className={field.input}
             />
           </div>
 
           <div>
-            <label className="block text-[12px] font-semibold text-text mb-1">الدور *</label>
+            <label className={field.label}>الدور *</label>
             <select
               value={form.role_key}
               onChange={(e) => setForm({ ...form, role_key: e.target.value })}
-              className="w-full bg-surface-light border border-border-light rounded-xl py-2.5 px-3.5 text-sm text-text focus:outline-none focus:border-primary/50"
+              className={field.select}
             >
               {roles.map((r) => (
                 <option key={r.key} value={r.key}>{r.label} ({r.key})</option>
@@ -302,28 +284,10 @@ export default function Users() {
           )}
 
           {error && (
-            <p className="text-[12px] text-red-500 bg-red-50/60 rounded-lg px-3 py-2">{error}</p>
+            <p className="text-[12px] text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
           )}
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-border-light">
-            <button
-              onClick={closeModal}
-              disabled={saving}
-              className="px-4 py-2 rounded-lg text-text-secondary text-[13px] font-medium hover:bg-surface-lighter transition-colors"
-            >
-              إلغاء
-            </button>
-            <button
-              onClick={save}
-              disabled={saving}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-[13px] font-bold transition-colors disabled:opacity-60"
-            >
-              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {editing === 'new' ? 'إضافة' : 'حفظ'}
-            </button>
-          </div>
         </div>
-      </Modal>
+      </Sheet>
     </div>
   )
 }

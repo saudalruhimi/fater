@@ -45,7 +45,7 @@ function Toggle({ checked, onChange }) {
       }`}
     >
       <span
-        className={`absolute top-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-all ${
+        className={`absolute top-0.5 w-[18px] h-[18px] rounded-full bg-surface shadow-sm transition-all ${
           checked ? 'right-0.5' : 'right-[18px]'
         }`}
       />
@@ -55,13 +55,16 @@ function Toggle({ checked, onChange }) {
 
 function SectionCard({ title, description, children }) {
   return (
-    <div className="bg-white rounded-2xl border border-border-light p-5 sm:p-6">
-      <div className="mb-5">
-        <h3 className="text-[14px] font-semibold text-text">{title}</h3>
-        {description && <p className="text-[12px] text-text-muted mt-0.5">{description}</p>}
+    <section>
+      <div className="flex items-baseline gap-3 mb-5">
+        <div>
+          <h3 className="text-[13px] font-bold text-text whitespace-nowrap">{title}</h3>
+          {description && <p className="text-[11.5px] text-text-muted mt-0.5">{description}</p>}
+        </div>
+        <div className="flex-1 border-b border-border self-center" />
       </div>
       {children}
-    </div>
+    </section>
   )
 }
 
@@ -151,7 +154,7 @@ function IntegrationsTab() {
 
   return (
     <div className="space-y-5">
-      <div className="bg-white rounded-2xl border border-border-light overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-border overflow-hidden">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 sm:p-6 border-b border-border-light">
           <div className="flex items-center gap-3">
@@ -229,7 +232,7 @@ function IntegrationsTab() {
                     value={newKey}
                     onChange={(e) => setNewKey(e.target.value)}
                     placeholder="أدخل المفتاح الجديد"
-                    className="w-full bg-white border border-border-light rounded-xl py-2.5 px-3.5 text-sm text-text font-mono focus:outline-none focus:border-primary/50"
+                    className="w-full bg-surface border border-border-light rounded-xl py-2.5 px-3.5 text-sm text-text font-mono focus:outline-none focus:border-primary/50"
                     dir="ltr"
                   />
                   <div className="flex gap-2">
@@ -388,7 +391,7 @@ function ProfileTab() {
       <div className="flex justify-end">
         <button
           onClick={handleSave}
-          className={`flex items-center gap-2 font-semibold text-[13px] py-2.5 px-6 rounded-xl transition-all ${
+          className={`flex items-center gap-2 font-semibold text-[13px] py-2.5 px-6 rounded-full transition-all ${
             saved
               ? 'bg-primary-50 text-primary'
               : 'bg-primary hover:bg-primary-dark text-white'
@@ -439,7 +442,7 @@ function CompanyTab() {
       <div className="flex justify-end">
         <button
           onClick={handleSave}
-          className={`flex items-center gap-2 font-semibold text-[13px] py-2.5 px-6 rounded-xl transition-all ${
+          className={`flex items-center gap-2 font-semibold text-[13px] py-2.5 px-6 rounded-full transition-all ${
             saved ? 'bg-primary-50 text-primary' : 'bg-primary hover:bg-primary-dark text-white'
           }`}
         >
@@ -628,37 +631,35 @@ export default function SettingsPage() {
 
   return (
     <div className="w-full animate-page">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-lg sm:text-xl font-bold text-text">الإعدادات</h1>
-        <p className="text-xs sm:text-sm text-text-muted mt-1">إدارة حسابك وتفضيلات النظام</p>
-      </div>
-
-      <div className="flex flex-col lg:flex-row gap-5">
-        {/* Side tabs — horizontal on mobile, vertical on desktop */}
-        <div className="lg:w-48 flex-shrink-0">
-          <div className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0 bg-white lg:bg-white rounded-2xl lg:border border-border-light lg:p-2">
-            {availableTabs.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setActiveTab(t.key)}
-                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] font-medium whitespace-nowrap transition-all ${
-                  activeTab === t.key
-                    ? 'bg-primary-50 text-primary-dark'
-                    : 'text-text-secondary hover:bg-surface-lighter hover:text-text'
-                }`}
-              >
-                <t.icon className={`w-[18px] h-[18px] ${activeTab === t.key ? 'text-primary' : ''}`} strokeWidth={activeTab === t.key ? 2 : 1.6} />
-                <span>{t.label}</span>
-                {activeTab === t.key && <ChevronLeft className="w-3.5 h-3.5 text-primary mr-auto hidden lg:block" />}
-              </button>
-            ))}
-          </div>
+      {/* Editorial page header */}
+      <header className="mb-6 sm:mb-8">
+        <div className="pb-4">
+          <p className="text-[11px] font-bold text-primary-dark tracking-[0.12em] mb-2">النظام</p>
+          <h1 className="text-[26px] sm:text-[32px] font-black text-text leading-[1.25]">الإعدادات</h1>
+          <p className="text-[13.5px] text-text-secondary mt-2 leading-relaxed">إدارة حسابك وتفضيلات النظام والربط مع قيود.</p>
         </div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <ActiveComponent />
+        <div className="rule-double" />
+        <div className="pt-4 flex gap-1.5 overflow-x-auto pb-0.5">
+          {availableTabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap transition-colors ${
+                activeTab === t.key
+                  ? 'bg-text text-bg'
+                  : 'text-text-muted hover:text-text hover:bg-surface-lighter'
+              }`}
+            >
+              <t.icon className="w-3.5 h-3.5" strokeWidth={2} />
+              <span>{t.label}</span>
+            </button>
+          ))}
         </div>
+      </header>
+
+      {/* Content */}
+      <div className="max-w-3xl">
+        <ActiveComponent />
       </div>
     </div>
   )

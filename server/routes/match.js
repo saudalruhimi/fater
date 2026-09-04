@@ -13,10 +13,8 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'البنود مطلوبة' })
     }
 
-    if (!process.env.QOYOD_API_KEY) {
-      return res.status(500).json({ error: 'مفتاح Qoyod API غير مُعد' })
-    }
-
+    // The Qoyod key lives in Supabase (user_settings), not the environment —
+    // getProducts() raises its own Arabic error when it's missing.
     // Fetch products from Qoyod
     const products = await getProducts()
 

@@ -1,7 +1,7 @@
 import {
-  Upload, FileText, X, Image, Trash2, CheckCircle2, CloudUpload,
-  Sparkles, File, Loader2, AlertCircle, Send, ArrowRight, Plus, Pencil, ArrowLeft, Bookmark, Star,
-  Camera, Zap, Target, TrendingUp, AlertTriangle, FileImage,
+  Upload, FileText, X, Image, Trash2, CheckCircle2,
+  Sparkles, File, Loader2, AlertCircle, Send, ArrowRight, Plus, Pencil, ArrowLeft, Bookmark,
+  Camera, AlertTriangle,
 } from 'lucide-react'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { scanInvoice, matchItems, pushToQoyod, getInventories, getVendors, getProducts, createMapping, createVendorMapping, getVendorMappings, getNextBillNumber } from '../lib/api.js'
@@ -9,62 +9,65 @@ import { supabase } from '../lib/supabase.js'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import { useToast, parseError } from '../contexts/ToastContext.jsx'
 
-// Mode Selection: AI vs Manual
+// Mode Selection — بابان تحريريان يفصلهما خط شعري، أرقام فهرسية ضخمة
 function ModeSelect({ onSelect }) {
+  const modes = [
+    {
+      key: 'ai',
+      num: '٠١',
+      icon: Sparkles,
+      title: 'عبر الذكاء الاصطناعي',
+      tag: 'موصى به',
+      tagClass: 'bg-primary-50 text-primary-dark border-primary/20',
+      desc: 'ارفع صورة الفاتورة أو ملف PDF — يقرأ الذكاء الاصطناعي البيانات ويستخرج المورد والبنود والمبالغ خلال ثوانٍ.',
+      points: ['استخراج تلقائي للبيانات', 'رفع متعدد دفعة واحدة', 'مطابقة ذكية للموردين والبنود'],
+      foot: 'للفواتير المصوّرة وملفات PDF',
+    },
+    {
+      key: 'manual',
+      num: '٠٢',
+      icon: Pencil,
+      title: 'إدخال يدوي',
+      tag: 'دقة كاملة',
+      tagClass: 'bg-blue-50 text-blue-700 border-blue-200/60',
+      desc: 'أدخل بيانات الفاتورة بنفسك — اختر المورد والبنود واكتب الكميات والأسعار، ثم أرسلها لقيود مباشرة.',
+      points: ['تحكم كامل بكل الحقول', 'قوالب سريعة للفواتير المتكررة', 'ترقيم تلقائي لرقم الفاتورة'],
+      foot: 'للفواتير الجاهزة بياناتها',
+    },
+  ]
+
   return (
-    <div className="max-w-5xl mx-auto">
-      {/* Hero header */}
-      <div className="text-center mb-8 sm:mb-10">
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-text tracking-tight mb-2">
-          كيف تبي تدخل الفاتورة؟
-        </h2>
-        <p className="text-[13px] sm:text-sm text-text-muted">
-          اختر الطريقة الأنسب لنوع الفاتورة عندك
-        </p>
+    <div className="max-w-4xl mx-auto">
+      <div className="text-center mb-8">
+        <h2 className="text-xl sm:text-2xl font-bold text-text tracking-tight mb-1.5">كيف تبي تدخل الفاتورة؟</h2>
+        <p className="text-[13px] text-text-muted">اختر الطريقة الأنسب لنوع الفاتورة عندك</p>
       </div>
 
-      <div className="grid gap-4 sm:gap-5 sm:grid-cols-2">
-        {/* AI Card */}
-        <button
-          onClick={() => onSelect('ai')}
-          className="group relative overflow-hidden rounded-3xl bg-surface border border-border-light hover:border-primary/40 p-7 sm:p-8 text-right transition-all hover:shadow-[0_8px_24px_rgba(16,185,129,0.12)]"
-        >
-          {/* Decorative gradient glow */}
-          <div className="absolute -top-20 -left-20 w-48 h-48 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.18), transparent 70%)' }} />
-          {/* Dot pattern */}
-          <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{
-            backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
-            backgroundSize: '18px 18px',
-            color: 'var(--color-primary)',
-          }} />
-
-          <div className="relative">
-            {/* Top row: icon + recommended badge */}
-            <div className="flex items-start justify-between mb-5">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary group-hover:border-primary transition-colors">
-                <Sparkles className="w-7 h-7 text-primary group-hover:text-white transition-colors" strokeWidth={1.6} />
-              </div>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10.5px] font-bold text-primary">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                موصى به
+      <div className="grid sm:grid-cols-2 gap-px bg-border border border-border rounded-2xl overflow-hidden">
+        {modes.map((m) => (
+          <button
+            key={m.key}
+            onClick={() => onSelect(m.key)}
+            className="group bg-surface hover:bg-surface-light text-right p-7 sm:p-9 transition-colors flex flex-col"
+          >
+            {/* Index number + tag */}
+            <div className="flex items-start justify-between mb-6">
+              <span className="text-[44px] leading-none font-bold text-border-light group-hover:text-primary/25 transition-colors select-none" aria-hidden>
+                {m.num}
+              </span>
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[10.5px] font-bold ${m.tagClass}`}>
+                {m.tag}
               </span>
             </div>
 
-            <h3 className="text-xl sm:text-[22px] font-extrabold text-text tracking-tight mb-2">
-              عبر الذكاء الاصطناعي
-            </h3>
-            <p className="text-[13px] text-text-secondary leading-relaxed mb-5">
-              ارفع صورة الفاتورة أو ملف PDF — يقرأ الذكاء الاصطناعي البيانات تلقائياً ويستخرج المورد والبنود والمبالغ خلال ثوانٍ.
-            </p>
+            <div className="flex items-center gap-2.5 mb-2.5">
+              <m.icon className="w-5 h-5 text-primary" strokeWidth={1.8} />
+              <h3 className="text-lg sm:text-xl font-bold text-text tracking-tight">{m.title}</h3>
+            </div>
+            <p className="text-[13px] text-text-secondary leading-relaxed mb-5">{m.desc}</p>
 
-            {/* Feature checklist */}
-            <ul className="space-y-2 mb-6">
-              {[
-                'استخراج تلقائي للبيانات بدقة 99%',
-                'دعم رفع متعدد للفواتير دفعة واحدة',
-                'مطابقة ذكية للموردين والبنود',
-              ].map((f) => (
+            <ul className="space-y-2 mb-7">
+              {m.points.map((f) => (
                 <li key={f} className="flex items-center gap-2 text-[12.5px] text-text-secondary">
                   <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" strokeWidth={2.2} />
                   <span>{f}</span>
@@ -72,77 +75,15 @@ function ModeSelect({ onSelect }) {
               ))}
             </ul>
 
-            {/* CTA row */}
-            <div className="flex items-center justify-between pt-4 border-t border-border-light">
-              <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
-                <span>للفواتير الإلكترونية</span>
-                <span className="text-text-muted/40">·</span>
-                <span>الأسرع</span>
-              </div>
-              <span className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-primary group-hover:gap-2.5 transition-all">
+            <div className="mt-auto flex items-center justify-between pt-4 border-t border-border-light">
+              <span className="text-[11px] text-text-muted">{m.foot}</span>
+              <span className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-primary-dark group-hover:gap-3 transition-all">
                 ابدأ
                 <ArrowLeft className="w-4 h-4" strokeWidth={2.4} />
               </span>
             </div>
-          </div>
-        </button>
-
-        {/* Manual Card */}
-        <button
-          onClick={() => onSelect('manual')}
-          className="group relative overflow-hidden rounded-3xl bg-surface border border-border-light hover:border-blue-400/40 p-7 sm:p-8 text-right transition-all hover:shadow-[0_8px_24px_rgba(59,130,246,0.12)]"
-        >
-          <div className="absolute -top-20 -left-20 w-48 h-48 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.16), transparent 70%)' }} />
-          <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{
-            backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
-            backgroundSize: '18px 18px',
-            color: '#3B82F6',
-          }} />
-
-          <div className="relative">
-            <div className="flex items-start justify-between mb-5">
-              <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center group-hover:bg-blue-500 group-hover:border-blue-500 transition-colors">
-                <Pencil className="w-6 h-6 text-blue-500 group-hover:text-white transition-colors" strokeWidth={1.6} />
-              </div>
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10.5px] font-bold text-blue-500">
-                دقة 100%
-              </span>
-            </div>
-
-            <h3 className="text-xl sm:text-[22px] font-extrabold text-text tracking-tight mb-2">
-              إدخال يدوي
-            </h3>
-            <p className="text-[13px] text-text-secondary leading-relaxed mb-5">
-              أدخل بيانات الفاتورة بنفسك — اختر المورد والبنود واكتب الكميات والأسعار، ثم أرسلها لقيود مباشرة.
-            </p>
-
-            <ul className="space-y-2 mb-6">
-              {[
-                'تحكم كامل بكل الحقول والأرقام',
-                'قوالب سريعة للفواتير المتكررة',
-                'ترقيم تلقائي لرقم الفاتورة',
-              ].map((f) => (
-                <li key={f} className="flex items-center gap-2 text-[12.5px] text-text-secondary">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" strokeWidth={2.2} />
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-
-            <div className="flex items-center justify-between pt-4 border-t border-border-light">
-              <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
-                <span>للفواتير الورقية</span>
-                <span className="text-text-muted/40">·</span>
-                <span>دقة كاملة</span>
-              </div>
-              <span className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-blue-500 group-hover:gap-2.5 transition-all">
-                ابدأ
-                <ArrowLeft className="w-4 h-4" strokeWidth={2.4} />
-              </span>
-            </div>
-          </div>
-        </button>
+          </button>
+        ))}
       </div>
     </div>
   )
@@ -152,16 +93,6 @@ function formatSize(bytes) {
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
-
-// Compact stat card used in the AI upload hero section (number on top, label below, centered)
-function StatCard({ value, label }) {
-  return (
-    <div className="bg-surface-light border border-border rounded-xl px-4 py-3.5 text-center min-w-[88px]">
-      <div className="text-xl sm:text-[22px] font-extrabold text-text leading-none tracking-tight mb-1 font-mono" dir="ltr">{value}</div>
-      <div className="text-[10.5px] sm:text-[11px] text-text-muted font-medium">{label}</div>
-    </div>
-  )
 }
 
 // Status summary pill — shown at the top of the file queue
@@ -196,7 +127,7 @@ function FileCard({ file, onRemove, onPreview, onShowError, onRetry, disableRetr
     isDone ? 'border-primary/40 bg-primary-50/30'
     : isFailed ? 'border-red-300 bg-red-50/30'
     : isProcessing ? 'border-blue-300 bg-blue-50/20'
-    : 'border-border-light bg-white'
+    : 'border-border bg-surface'
 
   const statusLabel =
     isDone ? 'تم'
@@ -425,134 +356,41 @@ function UploadStep({ onScanned }) {
 
   return (
     <>
-      {/* Hero strip — gradient background with dot pattern */}
-      {!hasFiles && (
-        <div
-          className="relative overflow-hidden rounded-2xl mb-5 px-5 sm:px-8 py-7 sm:py-8 border border-border-light"
-          style={{ background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-light) 100%)' }}
-        >
-          {/* Dot pattern */}
-          <div className="absolute inset-0 opacity-50 pointer-events-none" style={{
-            backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.10) 1px, transparent 1px)',
-            backgroundSize: '20px 20px',
-          }} />
-          {/* Glow */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            background: 'radial-gradient(ellipse at 80% 50%, rgba(16,185,129,0.12), transparent 60%)',
-          }} />
-
-          <div className="relative flex items-center justify-between gap-6 flex-wrap">
-            <div className="flex-1 min-w-[260px]">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[11.5px] font-bold text-primary mb-3.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                مدعوم بالذكاء الاصطناعي
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-text leading-[1.15] tracking-tight mb-2.5">
-                ارفع فواتيرك للـ <span className="text-primary">AI</span>
-              </h2>
-              <p className="text-[14px] sm:text-[15px] text-text-secondary leading-relaxed max-w-lg">
-                استخرج البيانات تلقائياً من PDF، JPG، أو PNG في ثوانٍ. دقة 99% بدون إدخال يدوي.
-              </p>
-            </div>
-
-            {/* Stats — small horizontal cards */}
-            <div className="flex gap-2.5">
-              <StatCard value={monthCount != null ? monthCount.toLocaleString('en-US') : '—'} label="هذا الشهر" />
-              <StatCard value="99%" label="دقة" />
-              <StatCard value="1.2s" label="متوسط" />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Warning banner — inline with right border accent */}
-      {!hasFiles && (
-        <div
-          className="mb-5 flex items-center gap-2.5 rounded-xl px-3.5 py-2.5"
-          style={{
-            background: 'rgba(245,158,11,0.10)',
-            borderRight: '3px solid #F59E0B',
-          }}
-        >
-          <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" strokeWidth={2} />
-          <span className="text-[12.5px] font-bold text-text">تنبيه:</span>
-          <span className="flex-1 text-[12.5px] text-text-secondary">تأكد من اسم المنشأة قبل الإرسال</span>
-          <button
-            onClick={(e) => e.preventDefault()}
-            className="text-[11.5px] font-bold text-amber-500 hover:text-amber-400 px-2 py-1 rounded-md transition-colors whitespace-nowrap"
-          >
-            عرض التفاصيل ←
-          </button>
-        </div>
-      )}
-
-      {/* Stepper pills with chevron separators */}
-      {!hasFiles && (
-        <div className="flex items-center gap-2 mb-5 flex-wrap justify-end">
-          {[
-            { n: 1, label: 'رفع', active: true },
-            { n: 2, label: 'مطابقة', active: false },
-            { n: 3, label: 'إرسال', active: false },
-          ].map((s, i, arr) => (
-            <div key={s.n} className="flex items-center gap-2">
-              {i > 0 && <span className="text-text-muted">›</span>}
-              <div
-                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-[12.5px] font-semibold ${
-                  s.active
-                    ? 'bg-primary/10 border-primary/20 text-primary'
-                    : 'bg-surface border-border-light text-text-secondary'
-                }`}
-              >
-                <span
-                  className={`w-[18px] h-[18px] rounded-full inline-flex items-center justify-center text-[10px] font-bold ${
-                    s.active ? 'bg-primary text-white' : 'bg-surface-lighter text-text-muted'
-                  }`}
-                >
-                  {s.n}
-                </span>
-                {s.label}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Hidden file inputs (used by both views) */}
       <input ref={inputRef} type="file" multiple accept="image/*,.pdf"
         onChange={(e) => { addFiles(e.target.files); e.target.value = '' }} className="hidden" />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment"
         onChange={(e) => { addFiles(e.target.files); e.target.value = '' }} className="hidden" />
 
-      {/* Initial big drop zone — only when no files */}
+      {/* Initial drop zone — ورقة استقبال واحدة هادئة */}
       {!hasFiles && (
-        <div className="relative rounded-2xl bg-surface border border-border p-5 sm:p-6 overflow-hidden">
+        <div className="max-w-3xl mx-auto">
           <div
             onDragEnter={handleDrag}
             onDragOver={handleDrag}
             onDragLeave={handleDrag}
             onDrop={handleDrop}
-            className={`relative rounded-xl text-center px-6 py-14 sm:py-16 transition-all border-2 border-dashed ${
-              dragActive ? 'border-primary bg-primary-50/50' : 'border-border'
+            className={`relative rounded-2xl text-center px-6 py-16 sm:py-20 transition-all border-2 border-dashed ${
+              dragActive ? 'border-primary bg-primary-50' : 'border-border bg-surface'
             }`}
-            style={!dragActive ? { background: 'radial-gradient(ellipse at center top, rgba(16,185,129,0.10), transparent 65%)' } : undefined}
           >
             {/* Stack of 3 rotated file cards */}
-            <div className="relative mx-auto mb-5" style={{ width: 96, height: 80 }}>
+            <div className="relative mx-auto mb-6" style={{ width: 96, height: 80 }}>
               {[
-                { rot: -12, top: 4, left: 0, opacity: 0.5, color: 'var(--color-text-muted)' },
-                { rot: 6, top: 0, left: 18, opacity: 0.85, color: '#F59E0B' },
+                { rot: -10, top: 4, left: 0, opacity: 0.45, color: 'var(--color-text-muted)' },
+                { rot: 5, top: 0, left: 18, opacity: 0.75, color: '#D9A036' },
                 { rot: -3, top: 8, left: 36, opacity: 1, color: 'var(--color-primary)' },
               ].map((c, i) => (
                 <div
                   key={i}
-                  className="absolute rounded-[9px] bg-surface-light flex items-center justify-center"
+                  className="absolute rounded-[9px] bg-surface flex items-center justify-center"
                   style={{
                     top: c.top, left: c.left,
                     width: 54, height: 70,
                     border: `1.5px solid ${c.color}`,
                     transform: `rotate(${c.rot}deg)`,
                     opacity: c.opacity,
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+                    boxShadow: '0 4px 14px rgba(23,32,26,0.10)',
                   }}
                 >
                   <FileText className="w-5 h-5" style={{ color: c.color }} strokeWidth={2} />
@@ -560,25 +398,24 @@ function UploadStep({ onScanned }) {
               ))}
             </div>
 
-            <h3 className="text-xl sm:text-[22px] font-extrabold text-text leading-tight mb-1.5 tracking-tight">
-              {dragActive ? 'أفلت الملفات هنا' : 'اسحب أو اضغط لرفع الفواتير'}
+            <h3 className="text-xl sm:text-[22px] font-bold text-text leading-tight mb-1.5 tracking-tight">
+              {dragActive ? 'أفلت الملفات هنا' : 'اسحب فواتيرك هنا'}
             </h3>
-            <p className="text-[13px] text-text-muted mb-5">
-              رفع متعدد · حد أقصى 10MB · PDF / JPG / PNG
+            <p className="text-[13px] text-text-muted mb-6">
+              PDF / JPG / PNG · حتى 10MB للملف · رفع متعدد
             </p>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5">
               <button
                 onClick={() => inputRef.current?.click()}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary hover:bg-primary-dark text-white text-[13.5px] font-bold transition-colors"
-                style={{ boxShadow: '0 6px 16px rgba(16,185,129,0.30)' }}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-primary hover:bg-primary-dark text-white text-[13.5px] font-bold transition-colors"
               >
                 <Upload className="w-4 h-4" strokeWidth={2.4} />
                 رفع من الجهاز
               </button>
               <button
                 onClick={() => cameraRef.current?.click()}
-                className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-surface-light border border-border text-text text-[13.5px] font-semibold hover:border-primary/40 transition-colors"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full border border-border bg-surface text-text text-[13.5px] font-semibold hover:bg-surface-lighter transition-colors"
               >
                 <Camera className="w-4 h-4" strokeWidth={1.8} />
                 من الكاميرا
@@ -586,8 +423,15 @@ function UploadStep({ onScanned }) {
             </div>
           </div>
 
-          <div className="flex items-center justify-center mt-4 pt-4 border-t border-border-light text-[12px]">
-            <span className="text-text-muted">💡 نصيحة: للحصول على أفضل دقة، تأكد من وضوح الصورة</span>
+          {/* Meta line under the sheet */}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 mt-4 px-1 text-[12px] text-text-muted">
+            <span>
+              قُرئت هذا الشهر: <span className="font-bold text-text">{monthCount != null ? monthCount.toLocaleString('en-US') : '—'}</span> فاتورة
+            </span>
+            <span className="flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" strokeWidth={2} />
+              تأكد من اسم المنشأة قبل الإرسال
+            </span>
           </div>
         </div>
       )}
@@ -658,7 +502,7 @@ function UploadStep({ onScanned }) {
           </div>
 
           {/* Sticky bottom action bar */}
-          <div className="sticky bottom-0 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-bg/95 backdrop-blur-sm border-t border-border-light">
+          <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] lg:bottom-0 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-bg/95 backdrop-blur-sm border-t border-border-light">
             <div className="flex items-center flex-wrap justify-end gap-2">
               {hasUnprocessed && (
                 <button
@@ -687,7 +531,7 @@ function UploadStep({ onScanned }) {
 
       {preview && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setPreview(null)}>
-          <div className="bg-white rounded-2xl overflow-hidden max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-surface rounded-2xl overflow-hidden max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-border-light">
               <p className="text-sm font-medium text-text truncate">{preview.file.name}</p>
               <button onClick={() => setPreview(null)} className="p-1.5 rounded-lg hover:bg-surface-lighter"><X className="w-4 h-4 text-text-muted" /></button>
@@ -701,7 +545,7 @@ function UploadStep({ onScanned }) {
 
       {errorDetail && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setErrorDetail(null)}>
-          <div className="bg-white rounded-2xl overflow-hidden max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-surface rounded-2xl overflow-hidden max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-border-light flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
                 <AlertCircle className="w-4.5 h-4.5 text-red-500" strokeWidth={2} />
@@ -982,92 +826,99 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
     <div className="space-y-5">
       {/* Quick Templates (Manual mode only) */}
       {isManual && (
-        <div className="bg-white rounded-2xl border border-border-light p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Bookmark className="w-4 h-4 text-primary" strokeWidth={1.8} />
-              <h3 className="text-sm font-semibold text-text">القوالب السريعة</h3>
-              <span className="text-[11px] text-text-muted">({templates.length})</span>
-            </div>
+        <section>
+          <div className="flex items-center gap-3 mb-3">
+            <h3 className="text-[12px] font-bold text-text tracking-[0.08em] whitespace-nowrap flex items-center gap-1.5">
+              <Bookmark className="w-3.5 h-3.5 text-primary-dark" strokeWidth={2} />
+              القوالب السريعة <span className="text-text-muted font-medium">({templates.length})</span>
+            </h3>
+            <div className="flex-1 border-b border-border" />
             <button onClick={() => setShowSaveTemplate(!showSaveTemplate)}
               disabled={!vendorId || items.length === 0}
-              className="flex items-center gap-1.5 text-[12px] font-medium text-primary hover:bg-primary-50 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              className="flex items-center gap-1.5 text-[12px] font-semibold text-primary-dark hover:bg-primary-50 px-3 py-1 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">
               <Plus className="w-3.5 h-3.5" strokeWidth={2.2} /> حفظ كقالب
             </button>
           </div>
 
           {showSaveTemplate && (
-            <div className="flex items-center gap-2 mb-3 p-2.5 bg-surface-light rounded-xl">
+            <div className="flex items-center gap-2 mb-3">
               <input
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
                 placeholder="اسم القالب (مثال: فاتورة أسمنت شهرية)"
-                className="flex-1 bg-white border border-border-light rounded-lg py-1.5 px-3 text-[13px] focus:outline-none focus:border-primary/40"
+                className="flex-1 bg-surface-light border border-border rounded-full py-2 px-4 text-[13px] text-text placeholder-text-muted focus:outline-none focus:border-primary/50"
                 autoFocus
               />
               <button onClick={saveAsTemplate} disabled={!templateName.trim()}
-                className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white text-[12px] font-medium transition-colors disabled:opacity-40">
+                className="px-4 py-2 rounded-full bg-primary hover:bg-primary-dark text-white text-[12px] font-semibold transition-colors disabled:opacity-40">
                 حفظ
               </button>
               <button onClick={() => { setShowSaveTemplate(false); setTemplateName('') }}
-                className="p-1.5 rounded-lg text-text-muted hover:bg-white">
+                className="p-2 rounded-full text-text-muted hover:bg-surface-lighter">
                 <X className="w-4 h-4" />
               </button>
             </div>
           )}
 
           {templates.length === 0 ? (
-            <div className="py-6 text-center">
-              <Star className="w-6 h-6 text-text-muted/30 mx-auto mb-2" strokeWidth={1.4} />
-              <p className="text-[12px] text-text-muted">لا توجد قوالب محفوظة بعد</p>
-              <p className="text-[11px] text-text-muted/70 mt-1">أدخل فاتورة وضع المورد والبنود ثم اضغط "حفظ كقالب"</p>
-            </div>
+            <p className="text-[12px] text-text-muted py-3">
+              لا توجد قوالب بعد — جهّز فاتورة كاملة ثم اضغط «حفظ كقالب» لإعادة استخدامها لاحقاً.
+            </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <div className="flex flex-wrap gap-2">
               {templates.map(tpl => (
-                <div key={tpl.id} className="group relative bg-surface-light hover:bg-primary-50 border border-border-light hover:border-primary/30 rounded-xl p-3 transition-all">
-                  <button onClick={() => applyTemplate(tpl)} className="text-right w-full">
-                    <p className="text-[12px] font-semibold text-text truncate pl-6">{tpl.name}</p>
-                    <p className="text-[11px] text-text-muted truncate mt-0.5">{tpl.vendor_name || '—'}</p>
-                    <p className="text-[10px] text-text-muted/80 mt-0.5">{tpl.items.length} بند</p>
+                <div key={tpl.id} className="group relative flex items-center gap-2 bg-surface-light hover:bg-primary-50 border border-border hover:border-primary/30 rounded-full pr-4 pl-2 py-1.5 transition-colors">
+                  <button onClick={() => applyTemplate(tpl)} className="text-right">
+                    <span className="text-[12.5px] font-semibold text-text">{tpl.name}</span>
+                    <span className="text-[11px] text-text-muted mr-2">{tpl.items.length} بند</span>
                   </button>
                   <button onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl.id) }}
-                    className="absolute top-2 left-2 p-1 rounded text-text-muted/40 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity">
+                    className="p-1 rounded-full text-text-muted/50 hover:text-red-500 hover:bg-red-50 transition-colors">
                     <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </section>
       )}
 
-      {/* Invoice preview + Header info */}
-      <div className={`grid gap-4 ${data._previewUrl ? 'grid-cols-1 lg:grid-cols-[200px_1fr]' : 'grid-cols-1'}`}>
-        {/* Image preview thumbnail */}
+      {/* ═══ ورقة الفاتورة: عمود المعاينة + منطقة العمل ═══ */}
+      <div className={`grid gap-5 lg:gap-7 ${data._previewUrl ? 'lg:grid-cols-[240px_1fr]' : 'grid-cols-1'}`}>
+        {/* Preview rail — sticky beside the working area */}
         {data._previewUrl && (
-          <>
-            <div className="bg-white rounded-2xl border border-border-light p-2 flex flex-col items-center cursor-pointer hover:border-primary/30 transition-all card-hover"
-              onClick={() => setShowPreview(true)}>
+          <aside className="lg:sticky lg:top-24 self-start">
+            <button
+              type="button"
+              onClick={() => setShowPreview(true)}
+              className="w-full block rounded-2xl border border-border bg-surface p-2 hover:border-primary/40 transition-colors text-center"
+            >
               {data._isPdf ? (
-                <div className="w-full h-[240px] rounded-xl overflow-hidden">
+                <div className="w-full h-[230px] rounded-xl overflow-hidden">
                   <iframe src={data._previewUrl} className="w-full h-full border-0 rounded-xl pointer-events-none" title="معاينة الفاتورة" />
                 </div>
               ) : (
-                <img src={data._previewUrl} alt="الفاتورة" className="w-full rounded-xl object-contain max-h-[240px]" />
+                <img src={data._previewUrl} alt="الفاتورة" className="w-full rounded-xl object-contain max-h-[230px]" />
               )}
-              <p className="text-[10px] text-text-muted mt-2 flex items-center gap-1">
+              <span className="text-[10.5px] text-text-muted mt-2 flex items-center justify-center gap-1">
                 <Image className="w-3 h-3" /> اضغط للتكبير
-              </p>
-            </div>
+              </span>
+            </button>
+
+            {data.vendor_name && (
+              <div className="mt-3 rounded-xl border border-border-light bg-surface-light px-3 py-2.5">
+                <p className="text-[10px] text-text-muted mb-0.5">المورد كما قُرئ من الفاتورة</p>
+                <p className="text-[12.5px] font-semibold text-text leading-snug">{data.vendor_name}</p>
+              </div>
+            )}
 
             {/* Full preview modal */}
             {showPreview && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay"
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 modal-overlay"
                 onClick={() => setShowPreview(false)}>
-                <div className="relative max-w-4xl w-full max-h-[90vh] bg-white rounded-2xl p-2 shadow-2xl modal-content" onClick={e => e.stopPropagation()}>
+                <div className="relative max-w-4xl w-full max-h-[90vh] bg-surface rounded-2xl p-2 shadow-2xl modal-content" onClick={e => e.stopPropagation()}>
                   <button onClick={() => setShowPreview(false)}
-                    className="absolute -top-3 -left-3 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-text-muted hover:text-red-500 transition-colors z-10">
+                    className="absolute -top-3 -left-3 w-8 h-8 bg-surface rounded-full shadow-lg flex items-center justify-center text-text-muted hover:text-red-500 transition-colors z-10">
                     <X className="w-4 h-4" />
                   </button>
                   {data._isPdf ? (
@@ -1078,113 +929,131 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
                 </div>
               </div>
             )}
-          </>
+          </aside>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-[12px] font-medium text-text-muted mb-1">المورد</label>
-          <SearchableSelect
-            options={vendors.filter(v => (v.status || 'Active') === 'Active').map(v => ({ id: v.id, label: v.name }))}
-            value={vendorId}
-            onChange={setVendorId}
-            placeholder="-- اختر المورد --"
-            error={!vendorId}
-          />
-          {data.vendor_name && (
-            <p className="text-[10px] text-text-muted mt-1">بالفاتورة: {data.vendor_name}</p>
-          )}
-        </div>
-        <div>
-          <label className="block text-[12px] font-medium text-text-muted mb-1">رقم الفاتورة</label>
-          <input value={invoiceNum} onChange={e => setInvoiceNum(e.target.value)}
-            className="w-full bg-white border border-border-light rounded-xl py-2 px-3 text-sm text-text focus:outline-none focus:border-primary/50" />
-        </div>
-        <div>
-          <label className="block text-[12px] font-medium text-text-muted mb-1">تاريخ الفاتورة</label>
-          <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)}
-            className="w-full bg-white border border-border-light rounded-xl py-2 px-3 text-sm text-text focus:outline-none focus:border-primary/50" dir="ltr" />
-        </div>
-        <div>
-          <label className="block text-[12px] font-medium text-text-muted mb-1">تاريخ الاستحقاق</label>
-          <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-            className="w-full bg-white border border-border-light rounded-xl py-2 px-3 text-sm text-text focus:outline-none focus:border-primary/50" dir="ltr" />
-        </div>
-        </div>
-      </div>
+        {/* Working area */}
+        <div className="min-w-0 space-y-7">
+          {/* ── بيانات الفاتورة ── */}
+          <section>
+            <div className="flex items-center gap-3 mb-4">
+              <h3 className="text-[12px] font-bold text-text tracking-[0.08em] whitespace-nowrap">بيانات الفاتورة</h3>
+              <div className="flex-1 border-b border-border" />
+            </div>
 
-      {/* Items table */}
-      <div className="bg-white rounded-2xl border border-border-light overflow-hidden">
-        <div className="px-5 py-3 border-b border-border-light flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-text">البنود ({items.length})</h3>
-          {isManual && (
-            <button onClick={addItem}
-              className="flex items-center gap-1.5 text-[12px] font-medium text-primary hover:bg-primary-50 px-2.5 py-1 rounded-lg transition-colors">
-              <Plus className="w-3.5 h-3.5" strokeWidth={2.2} /> إضافة بند
-            </button>
-          )}
-        </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={data._previewUrl ? '' : 'sm:col-span-2 lg:col-span-1'}>
+                <label className="block text-[12px] font-semibold text-text-secondary mb-1.5">المورد في قيود</label>
+                <SearchableSelect
+                  options={vendors.filter(v => (v.status || 'Active') === 'Active').map(v => ({ id: v.id, label: v.name }))}
+                  value={vendorId}
+                  onChange={setVendorId}
+                  placeholder="-- اختر المورد --"
+                  error={!vendorId}
+                />
+                {!data._previewUrl && data.vendor_name && (
+                  <p className="text-[10.5px] text-text-muted mt-1.5">بالفاتورة: {data.vendor_name}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-text-secondary mb-1.5">رقم الفاتورة</label>
+                <input value={invoiceNum} onChange={e => setInvoiceNum(e.target.value)}
+                  className="w-full bg-surface-light border border-border rounded-xl py-2.5 px-3.5 text-sm text-text focus:outline-none focus:border-primary/50 transition-colors" />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-text-secondary mb-1.5">تاريخ الفاتورة</label>
+                <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)}
+                  className="w-full bg-surface-light border border-border rounded-xl py-2.5 px-3.5 text-sm text-text focus:outline-none focus:border-primary/50 transition-colors" dir="ltr" />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-text-secondary mb-1.5">تاريخ الاستحقاق</label>
+                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+                  className="w-full bg-surface-light border border-border rounded-xl py-2.5 px-3.5 text-sm text-text focus:outline-none focus:border-primary/50 transition-colors" dir="ltr" />
+              </div>
+            </div>
+          </section>
 
-        <div className="divide-y divide-border-light/60">
+          {/* ── البنود ── */}
+          <section>
+            <div className="flex items-center gap-3 mb-4">
+              <h3 className="text-[12px] font-bold text-text tracking-[0.08em] whitespace-nowrap">
+                البنود <span className="text-text-muted font-medium">({items.length})</span>
+              </h3>
+              <div className="flex-1 border-b border-border" />
+              {isManual && (
+                <button onClick={addItem}
+                  className="flex items-center gap-1.5 text-[12px] font-semibold text-primary-dark hover:bg-primary-50 px-3 py-1 rounded-full transition-colors whitespace-nowrap">
+                  <Plus className="w-3.5 h-3.5" strokeWidth={2.2} /> إضافة بند
+                </button>
+              )}
+            </div>
+
+            <div className="border-t-2 border-text">
           {items.length === 0 && isManual && (
-            <div className="py-12 flex flex-col items-center text-center">
-              <FileText className="w-8 h-8 text-text-muted/30 mb-2" />
-              <p className="text-sm text-text-muted">لا توجد بنود — أضف بنداً للبدء</p>
+            <div className="py-14 flex flex-col items-center text-center border-b border-border-light">
+              <div className="w-12 h-12 rounded-full border border-dashed border-border flex items-center justify-center mb-3">
+                <FileText className="w-5 h-5 text-text-muted" strokeWidth={1.5} />
+              </div>
+              <p className="text-sm font-semibold text-text mb-1">لا توجد بنود بعد</p>
+              <p className="text-[12px] text-text-muted">أضف بنداً للبدء، أو طبّق قالباً محفوظاً</p>
               <button onClick={addItem}
-                className="mt-3 flex items-center gap-1.5 text-[12px] font-medium text-primary hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors">
+                className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-primary hover:bg-primary-dark text-white text-[12.5px] font-semibold px-4 py-2 transition-colors">
                 <Plus className="w-3.5 h-3.5" strokeWidth={2.2} /> إضافة بند
               </button>
             </div>
           )}
           {items.map((item, idx) => (
-            <div key={idx} className="p-4 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                {/* Original description */}
-                {!isManual && (
-                  <>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-text-muted mb-0.5">البند بالفاتورة</p>
-                      <p className="text-[13px] font-medium text-text">{item.description}</p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-text-muted hidden sm:block flex-shrink-0" />
-                  </>
-                )}
+            <div key={idx} className="py-4 border-b border-border-light flex gap-3">
+              {/* Row index */}
+              <span className="text-[11px] font-bold text-text-muted/60 pt-0.5 w-4 flex-shrink-0 select-none">{idx + 1}</span>
 
-                {/* Matched product */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] text-text-muted mb-0.5">البند في قيود</p>
-                  <SearchableSelect
-                    options={products.map(p => ({ id: p.id, label: p.name }))}
-                    value={item.matched_product_id}
-                    onChange={(id) => {
-                      const p = products.find(p => p.id === id)
-                      updateItem(idx, 'matched_product_id', p?.id || null)
-                      updateItem(idx, 'matched_product_name', p?.name || null)
-                      if (isManual && p?.name && !item.description) {
-                        updateItem(idx, 'description', p.name)
-                      }
-                      updateItem(idx, 'match_type', p ? 'manual' : 'unmatched')
-                    }}
-                    placeholder="-- اختر البند --"
-                    error={!item.matched_product_id}
-                  />
+              <div className="flex-1 min-w-0 space-y-2.5">
+                {/* Invoice line → Qoyod product */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+                  {!isManual && (
+                    <>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10.5px] text-text-muted mb-0.5">البند بالفاتورة</p>
+                        <p className="text-[13px] font-semibold text-text leading-snug">{item.description}</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-text-muted hidden sm:block flex-shrink-0 mt-4" />
+                    </>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10.5px] text-text-muted mb-0.5">البند في قيود</p>
+                    <SearchableSelect
+                      options={products.map(p => ({ id: p.id, label: p.name }))}
+                      value={item.matched_product_id}
+                      onChange={(id) => {
+                        const p = products.find(p => p.id === id)
+                        updateItem(idx, 'matched_product_id', p?.id || null)
+                        updateItem(idx, 'matched_product_name', p?.name || null)
+                        if (isManual && p?.name && !item.description) {
+                          updateItem(idx, 'description', p.name)
+                        }
+                        updateItem(idx, 'match_type', p ? 'manual' : 'unmatched')
+                      }}
+                      placeholder="-- اختر البند --"
+                      error={!item.matched_product_id}
+                    />
+                  </div>
+
+                  {/* Status badge or delete */}
+                  {isManual ? (
+                    <button onClick={() => removeItem(idx)}
+                      className="self-start sm:self-center sm:mt-4 p-1.5 rounded-full text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap self-start sm:self-center sm:mt-4 flex-shrink-0 ${matchColor(item.match_type)}`}>
+                      {matchLabel(item.match_type)}
+                    </span>
+                  )}
                 </div>
 
-                {/* Status badge or delete */}
-                {isManual ? (
-                  <button onClick={() => removeItem(idx)}
-                    className="self-start sm:self-center p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap self-start sm:self-center ${matchColor(item.match_type)}`}>
-                    {matchLabel(item.match_type)}
-                  </span>
-                )}
-              </div>
-
-              {/* Qty, price, discount, total */}
-              <div className="flex flex-wrap items-center gap-3 text-[13px]">
+                {/* Qty, price, discount, total */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px] pt-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="text-text-muted text-[11px]">كمية:</span>
                   <input
@@ -1201,7 +1070,7 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
                       const n = parseFloat(e.target.value)
                       updateItem(idx, 'quantity', isNaN(n) ? 0 : n)
                     }}
-                    className="w-20 bg-surface-light border border-border-light rounded-lg py-1 px-2 text-center text-text focus:outline-none" dir="ltr" />
+                    className="w-20 bg-surface-light border border-border rounded-lg py-1.5 px-2 text-center text-text focus:outline-none focus:border-primary/50 transition-colors" dir="ltr" />
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-text-muted text-[11px]">سعر:</span>
@@ -1219,11 +1088,11 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
                       const n = parseFloat(e.target.value)
                       updateItem(idx, 'unit_price', isNaN(n) ? 0 : n)
                     }}
-                    className="w-24 bg-surface-light border border-border-light rounded-lg py-1 px-2 text-center text-text focus:outline-none" dir="ltr" />
+                    className="w-24 bg-surface-light border border-border rounded-lg py-1.5 px-2 text-center text-text focus:outline-none focus:border-primary/50 transition-colors" dir="ltr" />
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-text-muted text-[11px]">خصم:</span>
-                  <div className="flex items-center bg-surface-light border border-border-light rounded-lg overflow-hidden">
+                  <div className="flex items-center bg-surface-light border border-border rounded-lg overflow-hidden">
                     <input
                       type="text"
                       inputMode="decimal"
@@ -1238,19 +1107,19 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
                         const n = parseFloat(e.target.value)
                         updateItem(idx, 'discount', isNaN(n) ? 0 : n)
                       }}
-                      className="w-20 bg-transparent py-1 px-2 text-center text-text focus:outline-none" dir="ltr" />
+                      className="w-20 bg-transparent py-1.5 px-2 text-center text-text focus:outline-none" dir="ltr" />
                     <select
                       value={item.discount_type || 'amount'}
                       onChange={e => updateItem(idx, 'discount_type', e.target.value)}
-                      className="bg-white border-r border-border-light py-1 px-1.5 text-[11px] text-text-muted focus:outline-none cursor-pointer"
+                      className="bg-surface border-r border-border py-1.5 px-1.5 text-[11px] text-text-muted focus:outline-none cursor-pointer"
                     >
                       <option value="amount">ر</option>
                       <option value="percent">%</option>
                     </select>
                   </div>
                 </div>
-                <span className="text-text-muted text-[11px]">الإجمالي:</span>
-                <span className="font-semibold text-text">{calcLineTotal(item).toFixed(2)} ر.س</span>
+                <span className="text-text-muted text-[11px] mr-auto">الإجمالي:</span>
+                <span className="font-bold text-text whitespace-nowrap">{calcLineTotal(item).toFixed(2)} <span className="text-[10px] font-normal text-text-muted">ر.س</span></span>
                 {(() => {
                   const target = printedLineExcl(item, data.vat_rate || 15)
                   if (target == null) return null
@@ -1260,40 +1129,45 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
                     <button
                       onClick={() => completeHalalas(idx)}
                       title={`المعروض شامل الضريبة بالفاتورة: ${(target * (1 + (data.vat_rate || 15) / 100)).toFixed(2)} ر.س — اضغط لمطابقة الإجمالي بدقة`}
-                      className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors whitespace-nowrap"
+                      className="text-[10px] px-2.5 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors whitespace-nowrap"
                     >
                       خصم الهللات ({diff > 0 ? '+' : ''}{diff.toFixed(2)})
                     </button>
                   )
                 })()}
+                </div>
               </div>
             </div>
           ))}
-        </div>
-
-        {/* Totals — always computed from current items so edits update live */}
-        {items.length > 0 && (() => {
-          const vatRate = data.vat_rate || 15
-          const subtotal = items.reduce((s, i) => s + calcLineTotal(i), 0)
-          const vatAmount = subtotal * (vatRate / 100)
-          const totalAmount = subtotal + vatAmount
-          return (
-            <div className="border-t border-border-light">
-              <div className="px-5 py-2 flex items-center justify-between">
-                <span className="text-[13px] text-text-muted">المجموع قبل الضريبة</span>
-                <span className="text-[13px] font-medium text-text">{subtotal.toFixed(2)} ر.س</span>
-              </div>
-              <div className="px-5 py-2 flex items-center justify-between">
-                <span className="text-[13px] text-text-muted">ضريبة القيمة المضافة ({data.vat_rate || 15}%)</span>
-                <span className="text-[13px] font-medium text-text">{vatAmount.toFixed(2)} ر.س</span>
-              </div>
-              <div className="px-5 py-3 bg-primary-50 flex items-center justify-between rounded-b-2xl">
-                <span className="text-sm font-semibold text-primary-dark">الإجمالي شامل الضريبة</span>
-                <span className="text-lg font-bold text-primary-dark">{totalAmount.toFixed(2)} ر.س</span>
-              </div>
             </div>
-          )
-        })()}
+
+            {/* Totals — always computed from current items so edits update live */}
+            {items.length > 0 && (() => {
+              const vatRate = data.vat_rate || 15
+              const subtotal = items.reduce((s, i) => s + calcLineTotal(i), 0)
+              const vatAmount = subtotal * (vatRate / 100)
+              const totalAmount = subtotal + vatAmount
+              return (
+                <div className="mt-1 flex justify-end">
+                  <div className="w-full sm:w-80">
+                    <div className="flex items-center justify-between py-2 border-b border-border-light">
+                      <span className="text-[12.5px] text-text-muted">المجموع قبل الضريبة</span>
+                      <span className="text-[13px] font-medium text-text">{subtotal.toFixed(2)} ر.س</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-border-light">
+                      <span className="text-[12.5px] text-text-muted">ضريبة القيمة المضافة ({vatRate}%)</span>
+                      <span className="text-[13px] font-medium text-text">{vatAmount.toFixed(2)} ر.س</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2.5 border-t-2 border-text">
+                      <span className="text-[13px] font-bold text-text">الإجمالي شامل الضريبة</span>
+                      <span className="text-lg font-bold text-text">{totalAmount.toFixed(2)} <span className="text-[11px] font-normal text-text-muted">ر.س</span></span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+          </section>
+        </div>
       </div>
 
       {error && (
@@ -1304,7 +1178,7 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
 
       {/* Sticky bottom action bar — different for batch (multi-invoice) vs single */}
       {navigation ? (
-        <div className="sticky bottom-0 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-bg/95 backdrop-blur-sm border-t border-border-light">
+        <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] lg:bottom-0 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-bg/95 backdrop-blur-sm border-t border-border-light">
           <div className="flex items-center flex-wrap gap-3 justify-between">
             {/* Prev / index / Next */}
             <div className="flex items-center gap-2">
@@ -1393,16 +1267,18 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
 // Step 3: Success
 function SuccessStep({ count, onReset }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-16 h-16 rounded-full bg-primary-50 flex items-center justify-center mb-4">
-        <CheckCircle2 className="w-8 h-8 text-primary" strokeWidth={1.6} />
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="relative w-20 h-20 rounded-full bg-primary-50 flex items-center justify-center mb-5">
+        <span className="absolute inset-0 rounded-full border border-primary/20" />
+        <CheckCircle2 className="w-9 h-9 text-primary-dark" strokeWidth={1.6} />
       </div>
-      <h2 className="text-lg font-bold text-text mb-1">تم الإرسال بنجاح</h2>
-      <p className="text-sm text-text-muted mb-6">
-        تم تسجيل {count > 1 ? `${count} فواتير` : 'الفاتورة'} في قيود بحالة معتمدة
+      <p className="text-[11px] font-bold text-primary-dark tracking-[0.14em] mb-2">تمت العملية</p>
+      <h2 className="text-2xl font-bold text-text mb-2 tracking-tight">تم الإرسال بنجاح</h2>
+      <p className="text-[13px] text-text-secondary mb-7 max-w-sm leading-relaxed">
+        تم تسجيل {count > 1 ? <span className="font-bold text-text">{count} فواتير</span> : 'الفاتورة'} في قيود بحالة معتمدة، وجاهزة للدفع من «سندات الصرف».
       </p>
       <button onClick={onReset}
-        className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-[13px] py-2.5 px-6 rounded-xl transition-colors">
+        className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-[13px] py-2.5 px-6 rounded-full transition-colors">
         <Upload className="w-4 h-4" /> رفع فاتورة أخرى
       </button>
     </div>
@@ -1670,64 +1546,56 @@ export default function UploadInvoice() {
     setError(null)
   }
 
-  // The AI upload step has its own hero design — hide the generic page header for it
-  const isAiUploadHero = mode === 'ai' && step === 'upload'
-
   return (
     <div className="w-full animate-page">
-      <div className="mb-6 sm:mb-8">
-        {!isAiUploadHero && (
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1">
-              <h1 className="text-lg sm:text-xl font-bold text-text">رفع الفواتير</h1>
-              <p className="text-xs sm:text-sm text-text-muted mt-1">
-                {mode === null && 'اختر طريقة إدخال الفاتورة'}
-                {step === 'match' && (invoiceStates.length > 0
-                  ? `فاتورة ${currentIdx + 1} من ${invoiceStates.length} — جهّز كل الفواتير ثم أرسلها دفعة واحدة`
-                  : mode === 'manual' ? 'أدخل بيانات الفاتورة يدوياً' : 'راجع البيانات المستخرجة وطابق البنود')}
-                {step === 'success' && 'تمت العملية بنجاح'}
-              </p>
-            </div>
+      {/* Editorial page header */}
+      <header className="mb-6 sm:mb-8">
+        <div className="flex flex-wrap items-end justify-between gap-4 pb-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-primary-dark tracking-[0.12em] mb-2">العمليات</p>
+            <h1 className="text-[26px] sm:text-[32px] font-black text-text leading-[1.25]">رفع الفواتير</h1>
+            <p className="text-[13.5px] text-text-secondary mt-2 leading-relaxed">
+              {mode === null && 'اختر طريقة إدخال الفاتورة'}
+              {mode === 'ai' && step === 'upload' && 'ارفع صور الفواتير أو ملفات PDF ليقرأها الذكاء الاصطناعي'}
+              {step === 'match' && (invoiceStates.length > 0
+                ? `فاتورة ${currentIdx + 1} من ${invoiceStates.length} — جهّز كل الفواتير ثم أرسلها دفعة واحدة`
+                : mode === 'manual' ? 'أدخل بيانات الفاتورة يدوياً' : 'راجع البيانات المستخرجة وطابق البنود')}
+              {step === 'success' && 'تمت العملية بنجاح'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* فهرس الخطوات — أرقام تحريرية */}
+            {mode && step !== 'success' && (
+              <div className="hidden sm:flex items-center gap-3">
+                {(mode === 'ai' ? ['رفع', 'مطابقة', 'إرسال'] : ['الإدخال', 'الإرسال']).map((s, i, arr) => {
+                  const stepIdx = mode === 'ai' ? (step === 'upload' ? 0 : 1) : 0
+                  const active = i <= stepIdx
+                  return (
+                    <div key={s} className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[15px] font-bold leading-none ${active ? 'text-primary-dark' : 'text-text-muted/50'}`}>
+                          {['٠١', '٠٢', '٠٣'][i]}
+                        </span>
+                        <span className={`text-[12px] ${active ? 'text-text font-semibold' : 'text-text-muted'}`}>{s}</span>
+                      </div>
+                      {i < arr.length - 1 && <span className={`w-6 h-px ${i < stepIdx ? 'bg-primary' : 'bg-border'}`} />}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
             {mode && step !== 'success' && (
               <button onClick={reset}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-text-muted hover:text-primary-dark hover:bg-primary-50 transition-colors flex-shrink-0">
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-border text-[12px] font-medium text-text-secondary hover:text-text hover:bg-surface-lighter transition-colors">
                 <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2} />
-                <span className="hidden sm:inline">اختر نمط آخر</span>
-                <span className="sm:hidden">رجوع</span>
+                نمط آخر
               </button>
             )}
           </div>
-        )}
-
-        {/* "Choose another mode" link only — for AI upload hero */}
-        {isAiUploadHero && (
-          <div className="flex justify-end mb-4">
-            <button onClick={reset}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-text-muted hover:text-primary-dark hover:bg-primary-50 transition-colors">
-              <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2} />
-              اختر نمط آخر
-            </button>
-          </div>
-        )}
-
-        {/* Steps indicator (hide on mode select and on hero — hero shows it differently) */}
-        {mode && step !== 'success' && !isAiUploadHero && (
-          <div className="flex items-center gap-2 mt-4">
-            {(mode === 'ai' ? ['رفع', 'مطابقة', 'إرسال'] : ['الإدخال', 'الإرسال']).map((s, i) => {
-              const stepIdx = mode === 'ai' ? (step === 'upload' ? 0 : 1) : 0
-              return (
-                <div key={s} className="flex items-center gap-2">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                    i <= stepIdx ? 'bg-primary text-white' : 'bg-surface-lighter text-text-muted'
-                  }`}>{i + 1}</div>
-                  <span className={`text-[12px] font-medium ${i <= stepIdx ? 'text-text' : 'text-text-muted'}`}>{s}</span>
-                  {i < (mode === 'ai' ? 2 : 1) && <div className={`w-8 h-px ${i < stepIdx ? 'bg-primary' : 'bg-border-light'}`} />}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+        </div>
+        <div className="rule-double" />
+      </header>
 
       {loading && (
         <div className="flex flex-col items-center justify-center py-20">
@@ -1759,7 +1627,7 @@ export default function UploadInvoice() {
                 const colorMap = {
                   pending: { bg: 'bg-surface', border: 'border-border-light', text: 'text-text-secondary', dot: 'bg-text-muted/40' },
                   ready: { bg: 'bg-primary-50', border: 'border-primary/30', text: 'text-primary-dark', dot: 'bg-primary' },
-                  sent: { bg: 'bg-primary', border: 'border-primary', text: 'text-white', dot: 'bg-white' },
+                  sent: { bg: 'bg-primary', border: 'border-primary', text: 'text-white', dot: 'bg-surface' },
                   failed: { bg: 'bg-red-50', border: 'border-red-300', text: 'text-red-600', dot: 'bg-red-500' },
                 }
                 const c = colorMap[s.status] || colorMap.pending

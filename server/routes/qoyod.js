@@ -89,9 +89,11 @@ router.post('/push', async (req, res) => {
   }
 })
 
-// GET /api/qoyod/bills — unpaid (Approved) bills from Qoyod
+// GET /api/qoyod/bills — unpaid (Approved) bills from Qoyod.
+// ?refresh=1 bypasses the cache, so the page's refresh button always hits Qoyod.
 router.get('/bills', async (req, res) => {
   try {
+    if (req.query.refresh) qoyod.invalidateCache('bills')
     const bills = await qoyod.getBills()
     res.json({ success: true, bills })
   } catch (e) {

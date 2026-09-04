@@ -18,7 +18,7 @@ function levenshtein(a, b) {
 
 // Normalize Arabic text for comparison
 function normalize(text) {
-  return text
+  return String(text || '')
     .replace(/[أإآ]/g, 'ا')
     .replace(/ة/g, 'ه')
     .replace(/ى/g, 'ي')
@@ -27,9 +27,43 @@ function normalize(text) {
     .toLowerCase()
 }
 
+// Length-relative similarity (0..1). An absolute edit-distance threshold lets short
+// Arabic names match almost anything — "أحواش" is within 5 edits of most 5-letter
+// names — so compare as a ratio of the longer string instead.
+function similarity(a, b) {
+  const maxLen = Math.max(a.length, b.length)
+  if (maxLen === 0) return 1
+  return 1 - levenshtein(a, b) / maxLen
+}
+
+// Saved mappings should be near-identical; the product catalogue can be looser.
+const MAPPING_MIN_SIMILARITY = 0.85
+const PRODUCT_MIN_SIMILARITY = 0.72
+
+// Run `worker` over `jobs` with at most `limit` in flight. Sequential AI calls are
+// the single slowest thing in this pipeline — an invoice with 10 unmatched lines
+// meant 10 round-trips back-to-back, which overruns a serverless request budget.
+async function mapWithConcurrency(jobs, limit, worker) {
+  const out = new Array(jobs.length)
+  let next = 0
+  const runners = Array.from({ length: Math.min(limit, jobs.length) }, async () => {
+    while (true) {
+      const i = next++
+      if (i >= jobs.length) return
+      out[i] = await worker(jobs[i], i)
+    }
+  })
+  await Promise.all(runners)
+  return out
+}
+
+const AI_CONCURRENCY = 4
+
 export async function matchItems(invoiceItems, vendorName, qoyodProducts) {
   const mappings = await readMappings()
   const results = []
+  // Lines that survive the deterministic passes go to the AI in one parallel batch.
+  const needsAi = []
 
   for (const item of invoiceItems) {
     const desc = item.description
@@ -48,66 +82,80 @@ export async function matchItems(invoiceItems, vendorName, qoyodProducts) {
       continue
     }
 
-    // 2. Fuzzy match in saved mappings (Levenshtein < 5)
-    const fuzzyMapping = mappings.find(
-      (m) => levenshtein(normalize(m.vendor_item_name), normalizedDesc) < 5
-    )
-    if (fuzzyMapping) {
+    // 2. Fuzzy match in saved mappings — keep the closest, not the first above the bar
+    let bestMapping = null
+    let bestMappingSim = 0
+    for (const m of mappings) {
+      const sim = similarity(normalize(m.vendor_item_name), normalizedDesc)
+      if (sim > bestMappingSim) {
+        bestMappingSim = sim
+        bestMapping = m
+      }
+    }
+    if (bestMapping && bestMappingSim >= MAPPING_MIN_SIMILARITY) {
       results.push({
         ...item,
         match_type: 'fuzzy_mapping',
-        matched_product_id: fuzzyMapping.qoyod_product_id,
-        matched_product_name: fuzzyMapping.qoyod_product_name,
-        confidence: 0.85,
+        matched_product_id: bestMapping.qoyod_product_id,
+        matched_product_name: bestMapping.qoyod_product_name,
+        confidence: bestMappingSim,
       })
       continue
     }
 
     // 3. Fuzzy match in Qoyod products
     let bestProduct = null
-    let bestDist = Infinity
+    let bestProductSim = 0
     for (const p of qoyodProducts) {
-      const dist = levenshtein(normalize(p.name), normalizedDesc)
-      if (dist < bestDist) {
-        bestDist = dist
+      const sim = similarity(normalize(p.name), normalizedDesc)
+      if (sim > bestProductSim) {
+        bestProductSim = sim
         bestProduct = p
       }
     }
-    if (bestProduct && bestDist < 8) {
+    if (bestProduct && bestProductSim >= PRODUCT_MIN_SIMILARITY) {
       results.push({
         ...item,
         match_type: 'fuzzy_product',
         matched_product_id: bestProduct.id,
         matched_product_name: bestProduct.name,
-        confidence: Math.max(0.5, 1 - bestDist / 20),
+        confidence: bestProductSim,
       })
       continue
     }
 
-    // 4. AI matching
-    try {
-      const aiResult = await aiMatch(desc, vendorName, qoyodProducts)
-      if (aiResult.product_id) {
-        results.push({
-          ...item,
-          match_type: 'ai',
-          matched_product_id: aiResult.product_id,
-          matched_product_name: aiResult.product_name,
-          confidence: aiResult.confidence || 0.6,
-        })
-        continue
-      }
-    } catch (e) {
-      // AI match failed, fall through to unmatched
-    }
-
-    // 5. Unmatched
+    // 4. Nothing deterministic matched — hold a slot and let the AI pass fill it.
     results.push({
       ...item,
       match_type: 'unmatched',
       matched_product_id: null,
       matched_product_name: null,
       confidence: 0,
+    })
+    needsAi.push({ item, desc, slot: results.length - 1 })
+  }
+
+  // 5. AI pass — all remaining lines at once, only trusting ids that really exist
+  // in the Qoyod catalogue (the model can invent both id and name).
+  if (needsAi.length) {
+    await mapWithConcurrency(needsAi, AI_CONCURRENCY, async ({ item, desc, slot }) => {
+      try {
+        const aiResult = await aiMatch(desc, vendorName, qoyodProducts)
+        const suggested = aiResult?.product_id != null
+          ? qoyodProducts.find((p) => String(p.id) === String(aiResult.product_id))
+          : null
+        if (suggested) {
+          results[slot] = {
+            ...item,
+            match_type: 'ai',
+            matched_product_id: suggested.id,
+            matched_product_name: suggested.name,
+            confidence: aiResult.confidence || 0.6,
+          }
+        }
+      } catch {
+        // AI match failed — the slot keeps its 'unmatched' placeholder
+      }
     })
   }
 

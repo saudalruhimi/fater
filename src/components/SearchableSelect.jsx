@@ -33,7 +33,7 @@ export default function SearchableSelect({ options, value, onChange, placeholder
         onClick={() => { setOpen(!open); setQuery('') }}
         className={`w-full flex items-center justify-between border rounded-xl py-2 px-3 text-[13px] text-right focus:outline-none transition-colors ${
           error ? 'bg-red-50 border-red-200 text-red-600' :
-          open ? 'bg-white border-primary/50 ring-1 ring-primary/10' : 'bg-white border-border-light text-text'
+          open ? 'bg-surface border-primary/50 ring-1 ring-primary/10' : 'bg-surface border-border text-text'
         }`}
       >
         <span className={selected ? 'text-text' : 'text-text-muted'}>
@@ -54,7 +54,7 @@ export default function SearchableSelect({ options, value, onChange, placeholder
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute z-50 top-full mt-1 w-full bg-white border border-border-light rounded-xl shadow-lg overflow-hidden">
+        <div className="absolute z-50 top-full mt-1 w-full bg-surface border border-border rounded-xl shadow-lg overflow-hidden dropdown-menu">
           {/* Search */}
           <div className="p-2 border-b border-border-light">
             <div className="relative">

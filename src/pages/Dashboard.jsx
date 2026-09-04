@@ -1,18 +1,17 @@
 import {
   FileText,
   Upload,
-  CheckCircle2,
-  AlertTriangle,
-  Plug,
   RefreshCw,
-  ExternalLink,
   Loader2,
+  BookOpen,
+  ArrowLeft,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { testQoyodConnection } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { ledger, EmptyState } from '../components/ui'
 
 const statusConfig = {
   scanned: { label: 'ممسوحة', bg: 'bg-blue-50 text-blue-700' },
@@ -45,27 +44,9 @@ function QoyodStatus() {
   }, [])
 
   const config = {
-    checking: {
-      border: 'border-border-light',
-      bg: 'bg-white',
-      dot: 'bg-gray-300 animate-pulse',
-      text: 'text-text-muted',
-      label: 'جارِ التحقق...',
-    },
-    connected: {
-      border: 'border-primary/20',
-      bg: 'bg-primary-50/40',
-      dot: 'bg-primary',
-      text: 'text-primary-dark',
-      label: 'متصل',
-    },
-    disconnected: {
-      border: 'border-red-200',
-      bg: 'bg-red-50/40',
-      dot: 'bg-red-400',
-      text: 'text-red-700',
-      label: 'غير متصل',
-    },
+    checking: { border: 'border-border', bg: 'bg-surface', text: 'text-text-muted', label: 'جارِ التحقق...' },
+    connected: { border: 'border-primary/20', bg: 'bg-primary-50', text: 'text-primary-dark', label: 'متصل بقيود' },
+    disconnected: { border: 'border-red-200', bg: 'bg-red-50', text: 'text-red-700', label: 'غير متصل' },
   }
 
   const c = config[status]
@@ -74,7 +55,7 @@ function QoyodStatus() {
     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${c.border} ${c.bg} transition-all`}>
       <div className="relative flex-shrink-0">
         <img src="/qoyod.png" alt="قيود" className="w-4 h-4 rounded-sm" />
-        <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-white ${status === 'connected' ? 'bg-primary animate-pulse' : status === 'disconnected' ? 'bg-red-400' : 'bg-gray-300 animate-pulse'}`} />
+        <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface ${status === 'connected' ? 'bg-primary' : status === 'disconnected' ? 'bg-red-400' : 'bg-gray-300 animate-pulse'}`} />
       </div>
       <span className={`text-[11px] font-medium ${c.text}`}>{c.label}</span>
       <button
@@ -101,6 +82,17 @@ function formatTimeAgo(dateStr) {
   if (diffHours < 24) return `منذ ${diffHours} ساعة`
   const diffDays = Math.floor(diffHours / 24)
   return `منذ ${diffDays} يوم`
+}
+
+// Small-caps section title with a hairline — the ledger side-widget header
+function SectionTitle({ children, trailing }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <h3 className="text-[12px] font-bold text-text tracking-[0.08em] whitespace-nowrap">{children}</h3>
+      <div className="flex-1 border-b border-border" />
+      {trailing}
+    </div>
+  )
 }
 
 export default function Dashboard() {
@@ -167,36 +159,20 @@ export default function Dashboard() {
   const matchedOrPushed = invoices.filter((inv) => inv.status === 'matched' || inv.status === 'pushed').length
   const matchRate = totalInvoices > 0 ? ((matchedOrPushed / totalInvoices) * 100).toFixed(1) : '0'
   const errorCount = invoices.filter((inv) => inv.status === 'error').length
-  const recentInvoices = invoices.slice(0, 5)
+  const recentInvoices = invoices.slice(0, 6)
 
   const maxWeek = Math.max(...weekData, 1)
+  const weekTotal = weekData.reduce((a, b) => a + b, 0)
+
+  const todayLabel = new Date().toLocaleDateString('ar', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   const stats = [
-    {
-      label: 'إجمالي الفواتير',
-      value: totalInvoices.toLocaleString('en-US'),
-      icon: FileText,
-      accent: 'bg-primary-50 text-primary',
-    },
-    {
-      label: 'مرفوعة اليوم',
-      value: todayInvoices.toLocaleString('en-US'),
-      icon: Upload,
-      accent: 'bg-blue-50 text-blue-600',
-    },
-    {
-      label: 'مطابقة ناجحة',
-      value: `${matchRate}%`,
-      icon: CheckCircle2,
-      accent: 'bg-emerald-50 text-emerald-600',
-    },
-    {
-      label: 'بها أخطاء',
-      value: errorCount.toLocaleString('en-US'),
-      icon: AlertTriangle,
-      accent: 'bg-amber-50 text-amber-600',
-    },
+    { label: 'إجمالي الفواتير', value: totalInvoices.toLocaleString('en-US'), sub: 'منذ بداية الاستخدام' },
+    { label: 'مرفوعة اليوم', value: todayInvoices.toLocaleString('en-US'), sub: todayInvoices > 0 ? 'استمر 👏' : 'لا شيء بعد' },
+    { label: 'نسبة المطابقة', value: `${Math.round(matchRate)}%`, sub: `${matchedOrPushed} من ${totalInvoices}`, admin: true },
+    { label: 'بها أخطاء', value: errorCount.toLocaleString('en-US'), sub: errorCount > 0 ? 'تحتاج مراجعة' : 'كل شيء سليم', alert: errorCount > 0 },
   ]
+  const visibleStats = isAdmin ? stats : stats.filter(s => !s.admin)
 
   if (loading) {
     return (
@@ -208,169 +184,184 @@ export default function Dashboard() {
 
   return (
     <div className="w-full animate-page">
-      {/* Welcome + Qoyod Status */}
-      <div className="mb-6 sm:mb-8 relative overflow-hidden bg-white rounded-2xl border border-border-light px-6 py-5" style={{
-        backgroundImage: 'linear-gradient(rgba(16,185,129,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(16,185,129,0.05) 1px, transparent 1px)',
-        backgroundSize: '24px 24px',
-      }}>
-        <div className="flex items-center justify-between relative z-10">
+      {/* ── Greeting band ── */}
+      <header className="mb-6 sm:mb-8">
+        <div className="flex flex-wrap items-end justify-between gap-4 pb-4">
           <div>
-            <h1 className="text-lg sm:text-xl font-bold text-text">حيّاك الله يا {profileName || user?.username} 👋</h1>
-            <p className="text-xs sm:text-sm text-text-muted mt-1">إليك ملخص نشاط الفواتير اليوم</p>
+            <p className="text-[11px] font-bold text-primary-dark tracking-[0.12em] mb-2">{todayLabel}</p>
+            <h1 className="text-[26px] sm:text-[32px] font-black text-text leading-[1.25]">
+              حيّاك الله يا {profileName || user?.username} 👋
+            </h1>
+            <p className="text-[13.5px] text-text-secondary mt-2 leading-relaxed">هذا دفتر نشاطك — آخر الفواتير، وأداء الأسبوع.</p>
           </div>
           <QoyodStatus />
         </div>
-      </div>
+        <div className="rule-double" />
+      </header>
 
-      {/* Stats — UPLOADER only sees count stats, not financial */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-        {(isAdmin ? stats : stats.filter(s => s.label !== 'مطابقة ناجحة')).map((s) => (
+      {/* ── Stat strip — one band, vertical hairlines ── */}
+      <div className="grid grid-cols-2 lg:flex mb-8 sm:mb-10 border-b border-border">
+        {visibleStats.map((s, i) => (
           <div
             key={s.label}
-            className="bg-white rounded-xl sm:rounded-2xl border border-border-light p-4 sm:p-5 card-hover"
+            className={`flex-1 py-4 sm:py-5 px-4 sm:px-6 ${i !== 0 ? 'lg:border-r lg:border-border' : ''} ${i % 2 === 1 ? 'border-r border-border lg:border-r' : ''} ${i >= 2 ? 'border-t border-border lg:border-t-0' : ''}`}
           >
-            <div className="flex items-start justify-between mb-3 sm:mb-4">
-              <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl ${s.accent} flex items-center justify-center`}>
-                <s.icon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" strokeWidth={1.8} />
-              </div>
-            </div>
-            <p className="text-xl sm:text-2xl font-bold text-text leading-none mb-1 stat-value">{s.value}</p>
-            <p className="text-[11px] sm:text-xs text-text-muted">{s.label}</p>
+            <p className="text-[11px] text-text-muted mb-2">{s.label}</p>
+            <p className={`text-[34px] sm:text-[42px] font-black leading-none stat-value ${s.alert ? 'text-red-600' : 'text-text'}`}>
+              {s.value}
+            </p>
+            <p className={`text-[11px] mt-2 ${s.alert ? 'text-red-500' : 'text-text-muted'}`}>{s.sub}</p>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
-        {/* Recent Invoices */}
-        <div className="lg:col-span-2 bg-white rounded-xl sm:rounded-2xl border border-border-light overflow-hidden">
-          <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-border-light">
-            <h2 className="text-sm font-semibold text-text">آخر الفواتير</h2>
-            <Link to="/history" className="text-xs text-primary hover:text-primary-dark transition-colors font-medium">
-              عرض الكل
-            </Link>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-10 lg:gap-12">
+        {/* ── Recent invoices — ledger table ── */}
+        <section className="min-w-0">
+          <SectionTitle
+            trailing={
+              <Link to="/history" className="flex items-center gap-1 text-[12px] font-semibold text-primary-dark hover:text-primary transition-colors whitespace-nowrap">
+                السجل الكامل
+                <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2} />
+              </Link>
+            }
+          >
+            آخر الفواتير
+          </SectionTitle>
 
           {recentInvoices.length > 0 ? (
-            <div className="divide-y divide-border-light/70">
-              {recentInvoices.map((inv) => (
-                <div
-                  key={inv.id}
-                  className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 sm:px-5 py-3 sm:py-3.5 hover:bg-surface-light/60 transition-colors"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-9 h-9 rounded-lg bg-surface-lighter flex items-center justify-center flex-shrink-0 hidden sm:flex">
-                      <FileText className="w-4 h-4 text-text-muted" strokeWidth={1.6} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-text truncate">{inv.vendor_name || 'بدون مورد'}</p>
-                      <p className="text-[11px] text-text-muted mt-0.5">
-                        {inv.invoice_number || '—'} · {formatTimeAgo(inv.created_at)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 pr-0 sm:pr-0">
-                    {isAdmin && (
-                    <div className="sm:text-left sm:min-w-[80px]">
-                      <span className="text-[13px] font-semibold text-text">
-                        {inv.total_amount != null ? Number(inv.total_amount).toLocaleString('en-US') : '—'}
-                      </span>
-                      {inv.total_amount != null && <span className="text-[10px] text-text-muted mr-1">ر.س</span>}
-                    </div>
-                    )}
-
-                    {statusConfig[inv.status] && (
-                      <span className={`text-[11px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${statusConfig[inv.status].bg}`}>
-                        {statusConfig[inv.status].label}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div className={ledger.wrap}>
+              <table className={ledger.table}>
+                <thead>
+                  <tr className={ledger.headRow}>
+                    <th className={`${ledger.th} w-8`}>#</th>
+                    <th className={ledger.th}>المورد</th>
+                    <th className={ledger.th}>رقم الفاتورة</th>
+                    {isAdmin && <th className={`${ledger.th} text-left`}>المبلغ</th>}
+                    <th className={ledger.th}>الحالة</th>
+                    <th className={`${ledger.th} text-left`}>الوقت</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentInvoices.map((inv, i) => (
+                    <tr key={inv.id} className={ledger.row}>
+                      <td className={`${ledger.td} text-text-muted text-[11px]`}>{i + 1}</td>
+                      <td className={`${ledger.td} font-semibold text-text`}>{inv.vendor_name || 'بدون مورد'}</td>
+                      <td className={`${ledger.td} text-text-muted font-mono text-[12px]`}>{inv.invoice_number || '—'}</td>
+                      {isAdmin && (
+                        <td className={`${ledger.td} text-left font-semibold text-text whitespace-nowrap`}>
+                          {inv.total_amount != null ? Number(inv.total_amount).toLocaleString('en-US') : '—'}
+                          {inv.total_amount != null && <span className="text-[10px] font-normal text-text-muted mr-1">ر.س</span>}
+                        </td>
+                      )}
+                      <td className={ledger.td}>
+                        {statusConfig[inv.status] && (
+                          <span className={`text-[11px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${statusConfig[inv.status].bg}`}>
+                            {statusConfig[inv.status].label}
+                          </span>
+                        )}
+                      </td>
+                      <td className={`${ledger.td} text-left text-text-muted text-[11px] whitespace-nowrap`}>{formatTimeAgo(inv.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
-            <div className="py-12 flex flex-col items-center text-center">
-              <div className="w-10 h-10 rounded-full bg-surface-lighter flex items-center justify-center mb-2">
-                <FileText className="w-5 h-5 text-text-muted" strokeWidth={1.5} />
-              </div>
-              <p className="text-sm font-medium text-text mb-0.5">لا توجد فواتير بعد</p>
-              <p className="text-xs text-text-muted">ارفع أول فاتورة للبدء</p>
-            </div>
+            <EmptyState
+              icon={FileText}
+              title="لا توجد فواتير بعد"
+              hint="ارفع أول فاتورة للبدء"
+              action={
+                <Link to="/upload" className="inline-flex items-center gap-2 rounded-full bg-primary hover:bg-primary-dark text-white text-[13px] font-semibold px-5 py-2.5 transition-colors">
+                  <Upload className="w-4 h-4" strokeWidth={2} />
+                  رفع فاتورة
+                </Link>
+              }
+            />
           )}
-        </div>
+        </section>
 
-        {/* Right Panel */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-          {/* Mini Chart */}
-          <div className="bg-white rounded-xl sm:rounded-2xl border border-border-light p-4 sm:p-5">
-            <div className="flex items-center justify-between mb-4 sm:mb-5">
-              <h3 className="text-sm font-semibold text-text">هذا الأسبوع</h3>
-            </div>
-
-            <div className="flex items-end gap-1.5 sm:gap-2 h-24 sm:h-28 mb-3">
+        {/* ── Side column — flat widgets ── */}
+        <aside className="flex flex-col gap-10">
+          {/* Week activity */}
+          <section>
+            <SectionTitle trailing={<span className="text-[11px] text-text-muted whitespace-nowrap">{weekTotal} فاتورة</span>}>
+              هذا الأسبوع
+            </SectionTitle>
+            <div className="flex items-end gap-2 h-28 mb-2 border-b border-border pb-px">
               {weekData.map((val, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-                  <div className="w-full">
-                    <div
-                      className={`w-full rounded-md transition-all ${
-                        i === weekData.length - 1 ? 'bg-primary' : 'bg-primary/15'
-                      }`}
-                      style={{ height: `${maxWeek > 0 ? (val / maxWeek) * 100 : 0}px` }}
-                    />
-                  </div>
+                <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
+                  {val > 0 && <span className="text-[10px] text-text-muted">{val}</span>}
+                  <div
+                    className={`w-full rounded-t-[3px] transition-all ${
+                      i === weekData.length - 1 ? 'bg-primary' : 'bg-primary/20'
+                    }`}
+                    style={{ height: `${Math.max((val / maxWeek) * 85, val > 0 ? 8 : 2)}%` }}
+                  />
                 </div>
               ))}
             </div>
-            <div className="flex gap-1.5 sm:gap-2">
+            <div className="flex gap-2">
               {weekDays.map((d, i) => (
-                <span key={i} className="flex-1 text-center text-[10px] text-text-muted">{d}</span>
+                <span key={i} className={`flex-1 text-center text-[10px] ${i === weekDays.length - 1 ? 'text-text font-bold' : 'text-text-muted'}`}>{d}</span>
               ))}
             </div>
-          </div>
+          </section>
 
-          {/* Quick Actions */}
-          <div className="bg-white rounded-xl sm:rounded-2xl border border-border-light p-4 sm:p-5">
-            <h3 className="text-sm font-semibold text-text mb-3">إجراءات سريعة</h3>
+          {/* Match rate */}
+          {isAdmin && (
+            <section>
+              <SectionTitle>نسبة المطابقة</SectionTitle>
+              <div className="flex items-center gap-4">
+                <div className="relative w-16 h-16 flex-shrink-0">
+                  <svg className="w-16 h-16 -rotate-90" viewBox="0 0 56 56">
+                    <circle cx="28" cy="28" r="24" fill="none" stroke="var(--color-surface-lighter)" strokeWidth="4" />
+                    <circle
+                      cx="28" cy="28" r="24" fill="none"
+                      stroke="var(--color-primary)" strokeWidth="4"
+                      strokeLinecap="round"
+                      strokeDasharray={`${2 * Math.PI * 24 * (matchRate / 100)} ${2 * Math.PI * 24}`}
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex items-center justify-center text-[13px] font-bold text-text">
+                    {Math.round(matchRate)}%
+                  </span>
+                </div>
+                <p className="text-[12px] text-text-secondary leading-relaxed">
+                  <span className="font-bold text-text">{matchedOrPushed}</span> فاتورة تمت مطابقتها أو رفعها من أصل <span className="font-bold text-text">{totalInvoices}</span>
+                </p>
+              </div>
+            </section>
+          )}
+
+          {/* Quick actions */}
+          <section>
+            <SectionTitle>إجراءات سريعة</SectionTitle>
             <div className="flex flex-col gap-2">
               <Link
                 to="/upload"
-                className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-primary text-white text-[13px] font-medium hover:bg-primary-dark transition-colors"
+                className="flex items-center justify-between px-4 py-3 rounded-full bg-primary text-white text-[13px] font-semibold hover:bg-primary-dark transition-colors"
               >
-                <Upload className="w-4 h-4" strokeWidth={2} />
-                رفع فاتورة جديدة
+                <span className="flex items-center gap-2.5">
+                  <Upload className="w-4 h-4" strokeWidth={2} />
+                  رفع فاتورة جديدة
+                </span>
+                <ArrowLeft className="w-4 h-4" strokeWidth={2} />
               </Link>
               <Link
                 to="/dictionary"
-                className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border text-text-secondary text-[13px] font-medium hover:bg-surface-lighter transition-colors"
+                className="flex items-center justify-between px-4 py-3 rounded-full border border-border text-text-secondary text-[13px] font-medium hover:bg-surface-lighter hover:text-text transition-colors"
               >
-                <CheckCircle2 className="w-4 h-4" strokeWidth={1.6} />
-                إدارة قاموس المطابقة
+                <span className="flex items-center gap-2.5">
+                  <BookOpen className="w-4 h-4" strokeWidth={1.6} />
+                  قاموس المطابقة
+                </span>
+                <ArrowLeft className="w-4 h-4" strokeWidth={1.6} />
               </Link>
             </div>
-          </div>
-
-          {/* Match rate ring */}
-          <div className="bg-white rounded-xl sm:rounded-2xl border border-border-light p-4 sm:p-5 flex items-center gap-4 sm:col-span-2 lg:col-span-1">
-            <div className="relative w-14 h-14 flex-shrink-0">
-              <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
-                <circle cx="28" cy="28" r="24" fill="none" stroke="#F3F4F6" strokeWidth="5" />
-                <circle
-                  cx="28" cy="28" r="24" fill="none"
-                  stroke="#10B981" strokeWidth="5"
-                  strokeLinecap="round"
-                  strokeDasharray={`${2 * Math.PI * 24 * (matchRate / 100)} ${2 * Math.PI * 24}`}
-                />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-text">
-                {Math.round(matchRate)}%
-              </span>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-text">نسبة المطابقة</p>
-              <p className="text-[11px] text-text-muted mt-0.5">{matchedOrPushed} من {totalInvoices} فاتورة</p>
-            </div>
-          </div>
-        </div>
+          </section>
+        </aside>
       </div>
     </div>
   )

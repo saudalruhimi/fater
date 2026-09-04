@@ -1,42 +1,26 @@
 import {
-  Search, Plus, Pencil, Trash2, X, BookOpen, Loader2, Users,
+  Search, Plus, Pencil, Trash2, BookOpen, Loader2,
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { getVendorMappings, createVendorMapping, updateVendorMapping, deleteVendorMapping, getVendors } from '../lib/api'
 import SearchableSelect from '../components/SearchableSelect'
 import { useToast, parseError } from '../contexts/ToastContext.jsx'
-
-function Modal({ open, onClose, title, children }) {
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 modal-overlay" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-light">
-          <h3 className="text-sm font-semibold text-text">{title}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-lighter transition-colors">
-            <X className="w-4 h-4 text-text-muted" />
-          </button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
-  )
-}
+import { PageHeader, Sheet, ConfirmDialog, EmptyState, ledger, field, btn } from '../components/ui'
 
 function Form({ form, setForm, vendorOptions }) {
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-[13px] font-medium text-text mb-1.5">اسم المورد كما يكتب بالفاتورة</label>
+        <label className={field.label}>اسم المورد كما يكتب بالفاتورة</label>
         <input
           value={form.invoice_vendor_name}
           onChange={(e) => setForm({ ...form, invoice_vendor_name: e.target.value })}
           placeholder="مثال: شركة اسمنت المدينة"
-          className="w-full bg-surface-light border border-border-light rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-primary/40"
+          className={field.input}
         />
       </div>
       <div>
-        <label className="block text-[13px] font-medium text-text mb-1.5">المورد المقابل في قيود</label>
+        <label className={field.label}>المورد المقابل في قيود</label>
         <SearchableSelect
           options={vendorOptions}
           value={form.qoyod_vendor_id}
@@ -167,64 +151,58 @@ export default function VendorDictionary() {
 
   return (
     <div className="w-full animate-page">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
-            <Users className="w-5 h-5 text-primary" strokeWidth={1.6} />
-          </div>
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-text">قاموس مطابقة الموردين</h1>
-            <p className="text-xs sm:text-sm text-text-muted mt-0.5">اربط أسماء الموردين بالفواتير مع مورديهم في قيود</p>
-          </div>
-        </div>
-        <button
-          onClick={() => { setForm(emptyForm); setAddOpen(true) }}
-          className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white text-[13px] font-semibold px-4 py-2.5 rounded-xl transition-colors"
-        >
-          <Plus className="w-4 h-4" /> إضافة مطابقة
-        </button>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-border-light p-4 mb-4">
-        <div className="relative">
+      <PageHeader
+        kicker="البيانات"
+        title="قاموس الموردين"
+        description="اربط أسماء الموردين كما تُكتب بالفواتير مع مورديهم في قيود — يُحفظ تلقائياً مع كل إرسال."
+        actions={
+          <button onClick={() => { setForm(emptyForm); setAddOpen(true) }} className={btn.primary}>
+            <Plus className="w-4 h-4" /> إضافة مطابقة
+          </button>
+        }
+      >
+        <div className="relative max-w-md">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" strokeWidth={1.6} />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ابحث باسم المورد..."
-            className="w-full bg-surface-light border border-border-light rounded-xl py-2.5 pr-10 pl-3.5 text-sm focus:outline-none focus:border-primary/40"
+            className="w-full bg-surface border border-border rounded-full py-2.5 pr-10 pl-4 text-[13px] text-text placeholder-text-muted focus:outline-none focus:border-primary/40 transition-colors"
           />
         </div>
-      </div>
+      </PageHeader>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-6 h-6 text-primary animate-spin" />
         </div>
       ) : filtered.length > 0 ? (
-        <div className="bg-white rounded-2xl border border-border-light overflow-hidden">
-          <div className="hidden sm:block">
-            <table className="w-full">
+        <>
+          {/* Desktop — ledger table */}
+          <div className={`hidden sm:block ${ledger.wrap}`}>
+            <table className={ledger.table}>
               <thead>
-                <tr className="border-b border-border-light text-[12px] text-text-muted">
-                  <th className="text-right font-medium px-5 py-3">اسم المورد بالفاتورة</th>
-                  <th className="text-right font-medium px-5 py-3">المورد في قيود</th>
-                  <th className="text-right font-medium px-5 py-3">مرات الاستخدام</th>
-                  <th className="text-right font-medium px-5 py-3">إجراءات</th>
+                <tr className={ledger.headRow}>
+                  <th className={`${ledger.th} w-8`}>#</th>
+                  <th className={ledger.th}>اسم المورد بالفاتورة</th>
+                  <th className={ledger.th}>المورد في قيود</th>
+                  <th className={ledger.th}>الاستخدام</th>
+                  <th className={`${ledger.th} text-left w-20`}></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((m, i) => (
-                  <tr key={m.id} className={`hover:bg-primary-50/20 transition-colors ${i !== filtered.length - 1 ? 'border-b border-border-light/60' : ''}`}>
-                    <td className="px-5 py-3 text-[13px] font-medium text-text">{m.invoice_vendor_name}</td>
-                    <td className="px-5 py-3 text-[13px] text-text">{m.qoyod_vendor_name}</td>
-                    <td className="px-5 py-3 text-[12px] text-text-muted">{m.times_used || 1}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => startEdit(m)} className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary-50 transition-colors">
+                  <tr key={m.id} className={`group ${ledger.row}`}>
+                    <td className={`${ledger.td} text-text-muted text-[11px]`}>{i + 1}</td>
+                    <td className={`${ledger.td} font-semibold text-text`}>{m.invoice_vendor_name}</td>
+                    <td className={`${ledger.td} text-text-secondary`}>{m.qoyod_vendor_name}</td>
+                    <td className={`${ledger.td} text-text-muted text-[12px]`}>{m.times_used || 1} مرة</td>
+                    <td className={ledger.td}>
+                      <div className="flex items-center gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => startEdit(m)} className="p-2 rounded-full hover:bg-surface-lighter text-text-muted hover:text-primary transition-colors">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => setDeleteItem(m)} className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors">
+                        <button onClick={() => setDeleteItem(m)} className="p-2 rounded-full hover:bg-red-50 text-text-muted hover:text-red-500 transition-colors">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -235,19 +213,20 @@ export default function VendorDictionary() {
             </table>
           </div>
 
-          <div className="sm:hidden divide-y divide-border-light/60">
+          {/* Mobile */}
+          <div className="sm:hidden border-t-2 border-text">
             {filtered.map((m) => (
-              <div key={m.id} className="p-4">
-                <div className="flex items-start justify-between gap-3 mb-2">
+              <div key={m.id} className="py-3.5 border-b border-border-light">
+                <div className="flex items-start justify-between gap-3 mb-1">
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-semibold text-text truncate">{m.invoice_vendor_name}</p>
-                    <p className="text-[11px] text-text-muted mt-0.5">→ {m.qoyod_vendor_name}</p>
+                    <p className="text-[11px] text-text-muted mt-0.5">← {m.qoyod_vendor_name}</p>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button onClick={() => startEdit(m)} className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary-50">
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                    <button onClick={() => startEdit(m)} className="p-1.5 rounded-full hover:bg-surface-lighter text-text-muted">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => setDeleteItem(m)} className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50">
+                    <button onClick={() => setDeleteItem(m)} className="p-1.5 rounded-full hover:bg-red-50 text-text-muted">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -256,55 +235,63 @@ export default function VendorDictionary() {
               </div>
             ))}
           </div>
-        </div>
+        </>
       ) : (
-        <div className="bg-white rounded-2xl border border-border-light py-16 flex flex-col items-center text-center">
-          <BookOpen className="w-8 h-8 text-text-muted/30 mb-3" />
-          <p className="text-sm text-text-muted">{search ? 'لا توجد نتائج' : 'لا توجد مطابقات بعد'}</p>
-          <p className="text-xs text-text-muted/70 mt-1">{search ? '' : 'النظام يحفظ المطابقات تلقائياً عند رفع الفواتير'}</p>
-        </div>
+        <EmptyState
+          icon={BookOpen}
+          title={search ? 'لا توجد نتائج' : 'لا توجد مطابقات بعد'}
+          hint={search ? 'جرّب كلمة بحث أخرى' : 'النظام يحفظ المطابقات تلقائياً عند رفع الفواتير'}
+        />
       )}
 
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="إضافة مطابقة جديدة">
+      {/* Add Sheet */}
+      <Sheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title="إضافة مطابقة جديدة"
+        subtitle="اسم بالفاتورة ← مورد في قيود"
+        footer={
+          <>
+            <button onClick={handleAdd} disabled={saving} className={`${btn.primary} flex-1`}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              إضافة
+            </button>
+            <button onClick={() => setAddOpen(false)} className={btn.ghost}>إلغاء</button>
+          </>
+        }
+      >
         <Form form={form} setForm={setForm} vendorOptions={vendorOptions} />
-        <div className="flex gap-2 mt-5">
-          <button onClick={() => setAddOpen(false)} className="flex-1 px-4 py-2.5 rounded-xl border border-border-light text-text-muted text-[13px] font-medium hover:bg-surface-lighter">
-            إلغاء
-          </button>
-          <button onClick={handleAdd} disabled={saving} className="flex-1 flex items-center justify-center gap-1.5 bg-primary hover:bg-primary-dark text-white text-[13px] font-semibold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-60">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            إضافة
-          </button>
-        </div>
-      </Modal>
+      </Sheet>
 
-      <Modal open={!!editItem} onClose={() => setEditItem(null)} title="تعديل المطابقة">
+      {/* Edit Sheet */}
+      <Sheet
+        open={!!editItem}
+        onClose={() => setEditItem(null)}
+        title="تعديل المطابقة"
+        subtitle={editItem?.invoice_vendor_name}
+        footer={
+          <>
+            <button onClick={handleEdit} disabled={saving} className={`${btn.primary} flex-1`}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              حفظ
+            </button>
+            <button onClick={() => setEditItem(null)} className={btn.ghost}>إلغاء</button>
+          </>
+        }
+      >
         <Form form={form} setForm={setForm} vendorOptions={vendorOptions} />
-        <div className="flex gap-2 mt-5">
-          <button onClick={() => setEditItem(null)} className="flex-1 px-4 py-2.5 rounded-xl border border-border-light text-text-muted text-[13px] font-medium hover:bg-surface-lighter">
-            إلغاء
-          </button>
-          <button onClick={handleEdit} disabled={saving} className="flex-1 flex items-center justify-center gap-1.5 bg-primary hover:bg-primary-dark text-white text-[13px] font-semibold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-60">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            حفظ
-          </button>
-        </div>
-      </Modal>
+      </Sheet>
 
-      <Modal open={!!deleteItem} onClose={() => setDeleteItem(null)} title="حذف المطابقة">
-        <p className="text-[13px] text-text-secondary mb-4">
-          هل تريد حذف مطابقة <strong className="text-text">{deleteItem?.invoice_vendor_name}</strong>؟
-        </p>
-        <div className="flex gap-2">
-          <button onClick={() => setDeleteItem(null)} className="flex-1 px-4 py-2.5 rounded-xl border border-border-light text-text-muted text-[13px] font-medium hover:bg-surface-lighter">
-            إلغاء
-          </button>
-          <button onClick={handleDelete} disabled={saving} className="flex-1 flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-600 text-white text-[13px] font-semibold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-60">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-            حذف
-          </button>
-        </div>
-      </Modal>
+      {/* Delete Confirm */}
+      <ConfirmDialog
+        open={!!deleteItem}
+        onClose={() => setDeleteItem(null)}
+        title="حذف المطابقة"
+        message="هل تريد حذف هذه المطابقة؟"
+        highlight={deleteItem?.invoice_vendor_name}
+        onConfirm={handleDelete}
+        loading={saving}
+      />
     </div>
   )
 }

@@ -4,10 +4,10 @@ import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react'
 const ToastContext = createContext(null)
 
 const ICONS = {
-  success: { Icon: CheckCircle2, ring: 'bg-emerald-500', tint: 'border-emerald-500/30' },
-  error: { Icon: AlertCircle, ring: 'bg-red-500', tint: 'border-red-500/30' },
-  warning: { Icon: AlertTriangle, ring: 'bg-amber-500', tint: 'border-amber-500/30' },
-  info: { Icon: Info, ring: 'bg-blue-500', tint: 'border-blue-500/30' },
+  success: { Icon: CheckCircle2, ring: 'bg-emerald-500', tint: 'border-emerald-500/30', chip: 'bg-emerald-50 text-emerald-600' },
+  error: { Icon: AlertCircle, ring: 'bg-red-500', tint: 'border-red-500/30', chip: 'bg-red-50 text-red-600' },
+  warning: { Icon: AlertTriangle, ring: 'bg-amber-500', tint: 'border-amber-500/30', chip: 'bg-amber-50 text-amber-600' },
+  info: { Icon: Info, ring: 'bg-blue-500', tint: 'border-blue-500/30', chip: 'bg-blue-50 text-blue-600' },
 }
 
 let nextId = 1
@@ -50,17 +50,12 @@ export function ToastProvider({ children }) {
           return (
             <div
               key={t.id}
-              className={`pointer-events-auto bg-white border ${cfg.tint} rounded-2xl shadow-lg overflow-hidden flex items-stretch toast-slide-in`}
+              className={`pointer-events-auto bg-surface border ${cfg.tint} rounded-2xl shadow-lg overflow-hidden flex items-stretch toast-slide-in`}
             >
               <div className={`w-1 ${cfg.ring} flex-shrink-0`} />
               <div className="flex items-start gap-3 p-3.5 flex-1 min-w-0">
-                <div className={`w-8 h-8 rounded-lg ${cfg.ring}/15 flex items-center justify-center flex-shrink-0`}>
-                  <Icon className={`w-4 h-4 ${
-                    t.type === 'success' ? 'text-emerald-600' :
-                    t.type === 'error' ? 'text-red-600' :
-                    t.type === 'warning' ? 'text-amber-600' :
-                    'text-blue-600'
-                  }`} strokeWidth={2} />
+                <div className={`w-8 h-8 rounded-lg ${cfg.chip} flex items-center justify-center flex-shrink-0`}>
+                  <Icon className="w-4 h-4" strokeWidth={2} />
                 </div>
                 <div className="flex-1 min-w-0">
                   {t.title && <p className="text-[13px] font-semibold text-text leading-snug">{t.title}</p>}
