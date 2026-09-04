@@ -486,7 +486,7 @@ export default function Layout() {
 
       {/* ═══════════ المحتوى ═══════════ */}
       <main className="mx-auto max-w-[1240px] px-4 sm:px-6 lg:px-8 pt-[84px] sm:pt-[92px] pb-28 lg:pb-12">
-        <Announcement id="ai-restored-2026-09" title="رجع الذكاء الاصطناعي يشتغل" until="2026-09-07">
+        <Announcement id="ai-restored-2026-09" title="رجع الذكاء الاصطناعي يشتغل" until="2026-09-07" dismissible={false}>
           قراءة الفواتير رجعت تعمل على الموقع بعد إصلاح سبب التوقف، وصارت أسرع.
           كذلك تحسّنت دقة مطابقة البنود — راجع المطابقة قبل الإرسال كالعادة.
         </Announcement>

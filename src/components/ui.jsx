@@ -161,13 +161,15 @@ export function EmptyState({ icon: Icon, title, hint, action }) {
 /* إعلان للمستخدمين — أخبار لا تحذير، فيُغلق ولا يعود.
    الإغلاق يُحفظ بالمعرّف، و`until` يجعله يختفي وحده بعد أن يصير الخبر قديماً
    حتى لو لم يغلقه أحد. */
-export function Announcement({ id, title, children, until, tone = 'good' }) {
+export function Announcement({ id, title, children, until, tone = 'good', dismissible = true }) {
   const key = `announcement_${id}`
+  // إعلان غير قابل للإغلاق يتجاهل ما حُفظ سابقاً: بقاؤه محكوم بـ until وحده
   const [dismissed, setDismissed] = useState(() => {
+    if (!dismissible) return false
     try { return localStorage.getItem(key) === '1' } catch { return false }
   })
 
-  if (dismissed) return null
+  if (dismissible && dismissed) return null
   if (until && new Date().toISOString().slice(0, 10) > until) return null
 
   const tones = {
@@ -189,13 +191,15 @@ export function Announcement({ id, title, children, until, tone = 'good' }) {
         <p className={`text-[13px] font-bold mb-0.5 ${t.head}`}>{title}</p>
         <p className="text-[12px] leading-relaxed text-text-secondary">{children}</p>
       </div>
-      <button
-        onClick={close}
-        aria-label="إغلاق الإعلان"
-        className="p-1 rounded-full text-text-muted hover:text-text hover:bg-surface transition-colors flex-shrink-0"
-      >
-        <X className="w-3.5 h-3.5" />
-      </button>
+      {dismissible && (
+        <button
+          onClick={close}
+          aria-label="إغلاق الإعلان"
+          className="p-1 rounded-full text-text-muted hover:text-text hover:bg-surface transition-colors flex-shrink-0"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   )
 }
