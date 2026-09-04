@@ -7,6 +7,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { scanInvoice, matchItems, pushToQoyod, getInventories, getVendors, getProducts, createMapping, createVendorMapping, getVendorMappings, getNextBillNumber } from '../lib/api.js'
 import { supabase } from '../lib/supabase.js'
 import SearchableSelect from '../components/SearchableSelect.jsx'
+import DatePicker from '../components/DatePicker.jsx'
 import { useToast, parseError } from '../contexts/ToastContext.jsx'
 
 // Mode Selection — بابان تحريريان يفصلهما خط شعري، أرقام فهرسية ضخمة
@@ -962,13 +963,11 @@ function MatchStep({ data, products, vendors, vendorMappings = [], onPush, onBac
               </div>
               <div>
                 <label className="block text-[12px] font-semibold text-text-secondary mb-1.5">تاريخ الفاتورة</label>
-                <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)}
-                  className="w-full bg-surface-light border border-border rounded-xl py-2.5 px-3.5 text-sm text-text focus:outline-none focus:border-primary/50 transition-colors" dir="ltr" />
+                <DatePicker value={invoiceDate} onChange={setInvoiceDate} placeholder="تاريخ الفاتورة" clearable={false} />
               </div>
               <div>
                 <label className="block text-[12px] font-semibold text-text-secondary mb-1.5">تاريخ الاستحقاق</label>
-                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-                  className="w-full bg-surface-light border border-border rounded-xl py-2.5 px-3.5 text-sm text-text focus:outline-none focus:border-primary/50 transition-colors" dir="ltr" />
+                <DatePicker value={dueDate} onChange={setDueDate} placeholder="تاريخ الاستحقاق" clearable={false} />
               </div>
             </div>
           </section>

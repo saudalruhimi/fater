@@ -8,6 +8,7 @@ import {
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { Announcement, AnnouncementModal } from './ui'
 
 /* ─────────── التنقّل: مجموعات الشريط العلوي ─────────── */
 const NAV = [
@@ -485,6 +486,10 @@ export default function Layout() {
 
       {/* ═══════════ المحتوى ═══════════ */}
       <main className="mx-auto max-w-[1240px] px-4 sm:px-6 lg:px-8 pt-[84px] sm:pt-[92px] pb-28 lg:pb-12">
+        <Announcement id="ai-restored-2026-09" title="رجع الذكاء الاصطناعي يشتغل" until="2026-09-07">
+          قراءة الفواتير رجعت تعمل على الموقع بعد إصلاح سبب التوقف، وصارت أسرع.
+          كذلك تحسّنت دقة مطابقة البنود — راجع المطابقة قبل الإرسال كالعادة.
+        </Announcement>
         <ZakharefWarning />
         <Outlet />
       </main>
@@ -584,6 +589,24 @@ export default function Layout() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* إعلان عودة الذكاء الاصطناعي — أول ما يشوفه المستخدم، ولا يزاحم مودال التحديثات */}
+      {!updateModalOpen && (
+        <AnnouncementModal
+          id="ai-restored-2026-09"
+          kicker="خبر النظام"
+          title="رجع الذكاء الاصطناعي يشتغل"
+          until="2026-09-07"
+          points={[
+            'قراءة الفواتير رجعت تعمل على الموقع بعد إصلاح سبب التوقف',
+            'صارت أسرع — الفاتورة تُقرأ خلال ثوانٍ معدودة',
+            'تحسّنت دقة مطابقة البنود، وقلّت المطابقات الخاطئة',
+          ]}
+          cta="تمام، ابدأ"
+        >
+          تقدر ترفع فواتيرك وتقرأها بالذكاء الاصطناعي زي أول. راجع المطابقة قبل الإرسال كالعادة.
+        </AnnouncementModal>
       )}
 
       {/* New Update Modal — shown once per user when there's a new update */}

@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { getBills, getAccounts, createBillPayment, updateBillPayment, deleteBillPayment } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { PageHeader, PillTabs, EmptyState, Sheet, ledger, field, btn } from '../components/ui'
+import DatePicker from '../components/DatePicker'
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -288,11 +289,9 @@ function PaySection({ paymentAccounts }) {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[12px] text-text-muted">من</span>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} dir="ltr"
-              className="bg-surface border border-border rounded-full py-2 px-3 text-[13px] text-text focus:outline-none focus:border-primary/40" />
+            <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="البداية" className="w-40" />
             <span className="text-[12px] text-text-muted">إلى</span>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} dir="ltr"
-              className="bg-surface border border-border rounded-full py-2 px-3 text-[13px] text-text focus:outline-none focus:border-primary/40" />
+            <DatePicker value={dateTo} onChange={setDateTo} placeholder="النهاية" className="w-40" />
             {(dateFrom || dateTo) && (
               <button onClick={() => { setDateFrom(''); setDateTo('') }} className="p-1.5 rounded-full hover:bg-surface-lighter text-text-muted hover:text-text"><X className="w-3.5 h-3.5" /></button>
             )}
@@ -708,7 +707,7 @@ function EditVoucherSheet({ voucher, paymentAccounts, onClose, onSaved }) {
         </div>
         <div>
           <label className={field.label}>تاريخ الدفع</label>
-          <input type="date" value={date || ''} onChange={e => setDate(e.target.value)} dir="ltr" className={field.input} />
+          <DatePicker value={date || ''} onChange={setDate} placeholder="تاريخ الدفع" />
         </div>
         <div>
           <label className={field.label}>حساب الدفع</label>

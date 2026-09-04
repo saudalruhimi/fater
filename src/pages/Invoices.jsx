@@ -2,6 +2,7 @@ import { Search, FileText, Loader2, SlidersHorizontal, X } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { PageHeader, PillTabs, EmptyState, ledger, field } from '../components/ui'
+import DatePicker from '../components/DatePicker'
 
 const STATUS = {
   pushed: { label: 'معتمدة', color: 'bg-primary-50 text-primary-dark' },
@@ -150,11 +151,11 @@ export default function Invoices() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className={field.label}>من تاريخ</label>
-                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} dir="ltr" className={field.input} />
+                  <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="من" />
                 </div>
                 <div>
                   <label className={field.label}>إلى تاريخ</label>
-                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} dir="ltr" className={field.input} />
+                  <DatePicker value={dateTo} onChange={setDateTo} placeholder="إلى" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:col-span-2 lg:col-span-1">

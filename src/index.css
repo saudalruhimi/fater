@@ -253,8 +253,8 @@ input[type="number"] {
   to { opacity: 1; }
 }
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.97); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(0.92) translateY(14px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 @keyframes slideInRight {
   from { opacity: 0; transform: translateX(16px); }
@@ -306,8 +306,8 @@ tr { transition: background-color 0.15s; }
   50% { opacity: 0.7; }
 }
 
-.modal-overlay { animation: fadeIn 0.18s var(--ease-out-quart); }
-.modal-content { animation: scaleIn 0.25s var(--ease-out-expo); }
+.modal-overlay { animation: fadeIn 0.34s var(--ease-out-quart); }
+.modal-content { animation: scaleIn 0.44s var(--ease-out-expo); }
 .toast-enter { animation: slideInRight 0.3s var(--ease-out-expo); }
 
 /* End-side sheet (forms slide in from the left edge in RTL) */
@@ -344,11 +344,31 @@ tr { transition: background-color 0.15s; }
 }
 .toast-slide-in { animation: toastSlideIn 0.28s var(--ease-out-quart) forwards; }
 
-.dropdown-menu { animation: dropdownOpen 0.18s var(--ease-out-quart); }
+.dropdown-menu { animation: dropdownOpen 0.3s var(--ease-out-expo); }
 @keyframes dropdownOpen {
-  from { opacity: 0; transform: translateY(-4px) scale(0.99); }
+  from { opacity: 0; transform: translateY(-10px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* ── حركات الخروج ──
+   React يزيل العنصر فوراً، فلا تُرى حركة إغلاق ما لم يبقَ مركّباً حتى تنتهي.
+   هذه الأصناف تُطبّق أثناء تلك المهلة (انظر usePresence في components/ui.jsx). */
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes scaleOut {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.94) translateY(10px); }
+}
+@keyframes dropdownClose {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-10px) scale(0.96); }
+}
+
+.modal-overlay-out { animation: fadeOut 0.28s var(--ease-out-quart) forwards; }
+.modal-content-out { animation: scaleOut 0.3s var(--ease-out-quart) forwards; }
+.dropdown-menu-out { animation: dropdownClose 0.24s var(--ease-out-quart) forwards; }
 
 /* Skeleton shimmer */
 @keyframes shimmer {
