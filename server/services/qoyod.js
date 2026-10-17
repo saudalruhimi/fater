@@ -80,11 +80,14 @@ async function request(method, path, body = null) {
   if (body) opts.body = JSON.stringify(body)
 
   const res = await fetch(`${BASE_URL}${path}`, opts)
-  const data = await res.json()
+  // Unknown routes answer with Rails' HTML 404 page, not JSON
+  const text = await res.text()
+  let data = null
+  try { data = JSON.parse(text) } catch { /* non-JSON body */ }
 
   if (!res.ok) {
-    console.error('Qoyod API Error:', res.status, JSON.stringify(data, null, 2))
-    const msg = data?.message || data?.error || data?.errors || JSON.stringify(data)
+    console.error('Qoyod API Error:', res.status, data ? JSON.stringify(data, null, 2) : text.slice(0, 200))
+    const msg = data?.message || data?.error || data?.errors || 'استجابة غير متوقعة من قيود'
     throw new Error(`Qoyod API ${res.status}: ${typeof msg === 'object' ? JSON.stringify(msg) : msg}`)
   }
 
@@ -104,8 +107,8 @@ export async function getProducts() {
 export async function getVendors() {
   const cached = cacheGet('vendors')
   if (cached) return cached
-  const data = await request('GET', '/vendors')
-  return cacheSet('vendors', data.contacts || data.vendors || data)
+  // Qoyod pages at 100 — a single GET silently dropped every vendor past the first page
+  return cacheSet('vendors', await fetchAllPages('/vendors', 'vendors', 30))
 }
 
 export async function createVendor({ name, organization, email, phone_number, tax_number }) {
@@ -129,7 +132,13 @@ export async function updateVendor(id, { name, organization, email, phone_number
 
 export async function deleteVendor(id) {
   invalidateCache('vendors')
-  return request('DELETE', `/vendors/${id}`)
+  try {
+    return await request('DELETE', `/vendors/${id}`)
+  } catch (e) {
+    // Qoyod's API has no vendor delete route — it 404s for every id
+    if (e.message.startsWith('Qoyod API 404')) throw new Error('قيود لا تسمح بحذف الموردين من الربط — احذفه من موقع قيود')
+    throw e
+  }
 }
 
 // Find next available BILL-N reference by scanning Qoyod bills.

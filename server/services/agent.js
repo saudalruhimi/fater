@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
 import { createClient } from '@supabase/supabase-js'
+import { getVendors } from './qoyod.js'
 
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY)
 
@@ -176,8 +177,7 @@ async function searchInvoices({ vendor_name, invoice_number, month, min_amount, 
 
 async function getVendorInfo({ vendor_name }) {
   // Get vendor from Qoyod
-  const vendorData = await qoyodReq('GET', '/vendors')
-  const vendors = vendorData.contacts || vendorData.vendors || []
+  const vendors = await getVendors()
   const search = vendor_name.toLowerCase()
   const vendor = vendors.find(
     (v) => (v.name || '').toLowerCase().includes(search) || (v.organization || '').toLowerCase().includes(search)
@@ -257,8 +257,7 @@ export async function executeConfirmedAction(action, data) {
 
 async function executeCreateBill(data) {
   // Find vendor
-  const vendorData = await qoyodReq('GET', '/vendors')
-  const vendors = vendorData.contacts || vendorData.vendors || []
+  const vendors = await getVendors()
   const search = (data.vendor_name || '').toLowerCase()
   const vendor = vendors.find((v) => (v.name || '').toLowerCase().includes(search))
   if (!vendor) throw new Error(`ما لقيت مورد باسم "${data.vendor_name}"`)
@@ -316,8 +315,7 @@ async function executeCreateBill(data) {
 
 async function executeCreatePayment(data) {
   // Find vendor
-  const vendorData = await qoyodReq('GET', '/vendors')
-  const vendors = vendorData.contacts || vendorData.vendors || []
+  const vendors = await getVendors()
   const search = (data.vendor_name || '').toLowerCase()
   const vendor = vendors.find((v) => (v.name || '').toLowerCase().includes(search))
   if (!vendor) throw new Error(`ما لقيت مورد باسم "${data.vendor_name}"`)
